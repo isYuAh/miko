@@ -3,5 +3,15 @@ members = ["miko", "miko-core", "miko-macros"]
 resolver = "3"
 
 [workspace.dependencies]
-miko-core = { path = "miko-core" }
-miko-macros = { path = "miko-macros" }
+miko-core = { path = "miko-core", version = "0.1.0"}
+miko-macros = { path = "miko-macros", version = "0.1.0" }
+
+[workspace.metadata.release]
+# 通用配置，只能放这些字段
+tag-name = "v{{version}}"
+push = true
+publish = true
+allow-branch = ["main", "master"]
+tag-message = "Release version {{version}}"
+consolidate-commits = true
+pre-release-commit-message = "chore: release {{version}}"

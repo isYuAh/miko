@@ -1,21 +1,21 @@
-# Release.toml - cargo-release 配置文件
-[workspace]
-allow-branch = ["main"]
-pre-release-commit-message = "chore: release {{version}}"
-post-release-commit-message = "chore: start development of {{next-version}}"
-tag-message = "Release {{version}}"
-tag-name = "v{{version}}"
+# # Release.toml - cargo-release 配置文件
+# [workspace]
+# allow-branch = ["main"]
+# pre-release-commit-message = "chore: release {{version}}"
+# post-release-commit-message = "chore: start development of {{next-version}}"
+# tag-message = "Release {{version}}"
+# tag-name = "v{{version}}"
 
-members = [
-    { name = "miko-core" },
-    { name = "miko-macros" },
-    { name = "miko" }
-]
+# members = [
+#     { name = "miko-core" },
+#     { name = "miko-macros" },
+#     { name = "miko" }
+# ]
 
-[workspace.pre-release-hooks]
-test = "cargo test --workspace"
-doc = "cargo doc --workspace --no-deps"
+# [workspace.pre-release-hooks]
+# test = "cargo test --workspace"
+# doc = "cargo doc --workspace --no-deps"
 
-[workspace.post-release-hooks]
-push = true
-tag = true
+# [workspace.post-release-hooks]
+# push = true
+# tag = true
