@@ -39,7 +39,7 @@ impl Router {
 }
 
 impl<S: Send + Sync + 'static> Router<S> {
-  pub fn route<F, A, Fut, R>(&mut self, method: Method, path: &str, handler: F)
+  pub fn route<F, A, Fut, R>(&mut self, method: &[Method], path: &str, handler: F)
   where
     F: FnOnceTuple<A, Output = Fut> + Clone + Send + Sync + 'static,
     A: FromRequest<S> + Send + 'static,
@@ -49,10 +49,12 @@ impl<S: Send + Sync + 'static> Router<S> {
     let handler = Arc::new(
       TypedHandler::new(handler, self.state.clone())
     ) as Arc<dyn Handler>;
-    self.routes
-      .entry(method)
-      .or_insert_with(|| MRouter::new())
-      .insert(path, handler)
-      .unwrap();
+    for m in method {
+      self.routes
+        .entry(m.clone())
+        .or_insert_with(|| MRouter::new())
+        .insert(path, handler.clone())
+        .unwrap();
+    }
   }
 }

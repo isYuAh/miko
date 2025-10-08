@@ -9,7 +9,7 @@ use http_body_util::combinators::BoxBody;
 use hyper::{Request, Response};
 use hyper::http::request::Parts;
 
-use crate::handler::extractor::from_request::FRFut;
+use crate::handler::extractor::from_request::{FRFut, FRPFut};
 use crate::handler::{extractor::from_request::FromRequestParts, into_response::IntoResponse, extractor::from_request::FromRequest};
 pub type RespBody = BoxBody<Bytes, Infallible>;
 pub type Resp = Response<RespBody>;
@@ -186,7 +186,7 @@ where
         let f = self.f.clone();
         let state = self.state.clone();
         Box::pin(async move {
-            let args = A::from_request(req, &state).await;
+            let args = A::from_request(req, state.clone()).await;
             let resp = f.call(args).await;
             resp.into_response()
         })
@@ -197,7 +197,7 @@ impl<S> FromRequest<S> for ()
 where
     S: Send + Sync + 'static,
 {
-    fn from_request<'a>(_req: Req, _state: &'a S) -> FRFut<'a, Self> {
+    fn from_request(_req: Req, _state: Arc<S>) -> FRFut<Self> {
         Box::pin(async move { () })
     }
 }
@@ -229,11 +229,11 @@ macro_rules! impl_from_request_parts_tuple {
             S: Send + Sync + 'static,
             $( $name: FromRequestParts<S> + __extract_kind::IsParts + Send + 'static, )+
         {
-            fn from_request_parts<'a>(parts: &'a Parts, state: &'a S) -> FRFut<'a, Self> {
+            fn from_request_parts<'a>(parts: &'a Parts, state: Arc<S>) -> FRPFut<'a, Self> {
                 Box::pin(async move {
                     (
                         $(
-                            $name::from_request_parts(parts, state).await,
+                            $name::from_request_parts(parts, state.clone()).await,
                         )+
                     )
                 })
@@ -250,11 +250,11 @@ macro_rules! impl_from_request_tuple {
             $( $name: FromRequestParts<S> + __extract_kind::IsParts + Send + 'static, )+
             $last: FromRequest<S> + __extract_kind::IsReq + Send + 'static,
         {
-            fn from_request<'a>(req: Req, state: &'a S) -> FRFut<'a, Self> {
+            fn from_request(req: Req, state: Arc<S>) -> FRFut<Self> {
                 Box::pin(async move {
                     let (mut parts, body) = req.into_parts();
                     $(
-                        let $name = $name::from_request_parts(&mut parts, state).await;
+                        let $name = $name::from_request_parts(&mut parts, state.clone()).await;
                     )+
                     let req = Req::from_parts(parts, body);
                     let $last = $last::from_request(req, state).await;
