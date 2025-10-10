@@ -81,24 +81,25 @@ macro_rules! impl_fn_once_tuple_all {
 
 impl_fn_once_tuple_all!();
 
-pub struct TypedHandler<F, A, S> {
+pub struct TypedHandler<F, A, S, M> {
     pub f: F,
     pub state: Arc<S>,
-    _marker: PhantomData<A>
+    _marker: PhantomData<(A, M)>
 }
-impl<F, A, S> TypedHandler<F, A, S> {
+impl<F, A, S, M> TypedHandler<F, A, S, M> {
     pub fn new(f: F, state: Arc<S>) -> Self {
         Self { f, state, _marker: PhantomData }
     }
 }
 
-impl<F, A, S, Fut, R> Handler for TypedHandler<F, A, S>
+impl<F, A, S, Fut, R, M> Handler for TypedHandler<F, A, S, M>
 where
     F: FnOnceTuple<A, Output = Fut> + Clone + Send + Sync + 'static,
-    A: FromRequest<S> + Send + 'static,
+    A: FromRequest<S, M> + Send + 'static,
     Fut: Future<Output = R> + Send + 'static,
     R: IntoResponse,
     S: Send + Sync + 'static,
+    M: Send + Sync + 'static,
 {
     fn call(&self, req: Req) -> Pin<Box<dyn Future<Output = Resp> + Send>> {
         let f = self.f.clone();
@@ -111,33 +112,19 @@ where
     }
 }
 
-impl<S> FromRequest<S> for () 
+impl<S> FromRequestParts<S> for () 
 where
     S: Send + Sync + 'static,
 {
-    fn from_request(_req: Req, _state: Arc<S>) -> FRFut<Self> {
+    fn from_request_parts(_req: &Parts, _state: Arc<S>) -> FRFut<Self> {
         Box::pin(async move { () })
     }
 }
-pub use __extract_kind::{PartsTag, ReqTag, IsParts, IsReq, Which};
+
+pub use __extract_kind::{PartsTag, ReqTag};
 mod __extract_kind {
     pub enum PartsTag {}
     pub enum ReqTag {}
-
-    pub(crate) mod sealed {
-        pub trait Sealed {}
-        impl<T> Sealed for T {}
-    }
-
-    pub trait Which: sealed::Sealed {
-        type Tag;
-    }
-
-    pub trait IsParts: Which<Tag = PartsTag> {}
-    pub trait IsReq:   Which<Tag = ReqTag>   {}
-
-    impl<T> IsParts for T where T: Which<Tag = PartsTag> {}
-    impl<T> IsReq   for T where T: Which<Tag = ReqTag>   {}
 }
 
 macro_rules! impl_from_request_parts_tuple {
@@ -145,7 +132,7 @@ macro_rules! impl_from_request_parts_tuple {
         impl<S, $($name,)+> FromRequestParts<S> for ($($name,)+)
         where
             S: Send + Sync + 'static,
-            $( $name: FromRequestParts<S> + __extract_kind::IsParts + Send + 'static, )+
+            $( $name: FromRequestParts<S> + Send + 'static, )+
         {
             fn from_request_parts<'a>(parts: &'a Parts, state: Arc<S>) -> FRPFut<'a, Self> {
                 Box::pin(async move {
@@ -165,8 +152,8 @@ macro_rules! impl_from_request_tuple {
         impl<S, $($name,)+ $last> FromRequest<S> for ($($name,)+ $last,)
         where
             S: Send + Sync + 'static,
-            $( $name: FromRequestParts<S> + __extract_kind::IsParts + Send + 'static, )+
-            $last: FromRequest<S> + __extract_kind::IsReq + Send + 'static,
+            $( $name: FromRequestParts<S> + Send + 'static, )+
+            $last: FromRequest<S> + Send + 'static,
         {
             fn from_request(req: Req, state: Arc<S>) -> FRFut<Self> {
                 Box::pin(async move {
