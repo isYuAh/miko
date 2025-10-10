@@ -6,12 +6,12 @@ use hyper::http::request::Parts;
 use crate::handler::handler::{PartsTag, ReqTag};
 use crate::handler::{handler::Req};
 pub type FRFut<T> = std::pin::Pin<Box<dyn Future<Output = T> + Send + 'static>>;
-pub type FRPFut<'a, T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>;
+pub type FRPFut<'a, T> = std::pin::Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 pub trait FromRequest<S = (), M = ReqTag>: Send + Sync + 'static {
   fn from_request(req: Req, state: Arc<S>) -> FRFut<Self>;
 }
 pub trait FromRequestParts<S = ()>: Send + Sync + 'static {
-  fn from_request_parts<'a>(req: &'a mut Parts, state: Arc<S>) -> FRPFut<'a, Self>;
+  fn from_request_parts(req: &mut Parts, state: Arc<S>) -> FRPFut<Self>;
 }
 
 impl FromRequest for Req {

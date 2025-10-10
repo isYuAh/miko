@@ -26,7 +26,7 @@ where
   Res: IntoResponse,
   {
     fn call(&self, req: Req) -> Pin<Box<dyn Future<Output = Resp> + Send>> {
-        let fut = (self)(req);
+        let fut = self(req);
         Box::pin(async move { fut.await.into_response() })
     }
   }
@@ -55,7 +55,7 @@ where
 {
     type Output = R;
     fn call(self, (): ()) -> R {
-        (self)()
+        self()
     }
 }
 
@@ -241,14 +241,14 @@ impl Service<Req> for HandlerSvc {
     type Response = Resp;
     type Error = Infallible;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
     fn call(&mut self, req: Req) -> Self::Future {
         let h = self.inner.clone();
         Box::pin(async move {
             Ok(h.call(req).await)
         })
-    }
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
     }
 }
 pub fn handler_to_svc(h: DynHandler) -> HttpSvc<Req> {

@@ -1,13 +1,11 @@
-use std::{convert::Infallible, sync::Arc};
-use http_body_util::BodyExt;
-use hyper::{body::Incoming, service::service_fn, Request, server::conn::http1};
+use std::{sync::Arc};
 use hyper_util::{rt::{TokioExecutor, TokioIo}, server::conn::auto::Builder as AutoBuilder, service::TowerToHyperService};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::{TcpListener};
 #[cfg(feature = "inner_log")]
 use tracing;
 use tokio::io::Result as IoResult;
 
-use crate::{config::config::ApplicationConfig, handler::{into_response::IntoResponse, router::{Router}}};
+use crate::{config::config::ApplicationConfig, handler::{router::{Router}}};
 use crate::handler::handler::Req;
 use crate::handler::incoming_to_req::IncomingToInternal;
 use crate::handler::router::HttpSvc;
@@ -51,15 +49,3 @@ impl Application {
     }
   }
 }
-
-// impl<S: Send + Sync + 'static> Application<S> {
-//   pub fn route<F, A, Fut, R>(&mut self, method: Method, path: &str, handler: F)
-//   where
-//     F: FnOnceTuple<A, Output = Fut> + Clone + Send + Sync + 'static,
-//     A: FromRequest<S> + Send + 'static,
-//     Fut: Future<Output = R> + Send + 'static,
-//     R: IntoResponse + Send + 'static,
-//   {
-//     self.router.route(method.into(), path, handler);
-//   }
-// }

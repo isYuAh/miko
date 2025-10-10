@@ -1,6 +1,5 @@
 use std::{future::Future, pin::Pin, task::{Context, Poll}};
 use std::convert::Infallible;
-use std::sync::Arc;
 use tower::Service;
 use miko_core::fast_builder::ResponseBuilder;
 use crate::handler::handler::{Req, Resp};

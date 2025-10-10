@@ -36,7 +36,7 @@ where T: DeserializeOwned + Send + Sync + 'static {
 }
 
 impl<T> FromRequestParts for Path<T>
-where T: From<String> + std::marker::Send + Sync + 'static
+where T: From<String> + Send + Sync + 'static
 {
     fn from_request_parts(req: &mut Parts, _state: Arc<()>) -> FRFut<Self> {
         let pp = req.extensions.get_mut::<PathParams>().unwrap();
