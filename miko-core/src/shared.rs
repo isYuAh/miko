@@ -1,3 +1,8 @@
+use std::convert::Infallible;
+use bytes::Bytes;
+use http_body_util::combinators::BoxBody;
+use hyper::{Request, Response};
+
 pub enum HTTPStatusCode {
   OK = 200,
   Created = 201,
@@ -33,3 +38,7 @@ pub enum HTTPStatusCode {
   UnavailableForLegalReasons = 451,
   InternalServerError = 500,
 }
+
+pub type RespBody = BoxBody<Bytes, Infallible>;
+pub type Resp = Response<RespBody>;
+pub type Req = Request<RespBody>;

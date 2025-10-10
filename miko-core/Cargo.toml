@@ -8,5 +8,9 @@ repository = "https://github.com/miko-rs/miko"
 
 
 [dependencies]
-hyper = "1.7.0"
+hyper = {version = "1.7.0", features = ["server", "http1"]}
+hyper-util = {version = "0.1.17", features = ["full"]}
 percent-encoding = "2.3.2"
+bytes = "1.10.1"
+futures = "0.3.31"
+http-body-util = "0.1.3"

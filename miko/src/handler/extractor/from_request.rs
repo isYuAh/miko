@@ -11,7 +11,7 @@ pub trait FromRequest<S = (), M = ReqTag>: Send + Sync + 'static {
   fn from_request(req: Req, state: Arc<S>) -> FRFut<Self>;
 }
 pub trait FromRequestParts<S = ()>: Send + Sync + 'static {
-  fn from_request_parts<'a>(req: &'a Parts, state: Arc<S>) -> FRPFut<'a, Self>;
+  fn from_request_parts<'a>(req: &'a mut Parts, state: Arc<S>) -> FRPFut<'a, Self>;
 }
 
 impl FromRequest for Req {
@@ -28,15 +28,15 @@ where
     T: FromRequestParts<S> + Send + 'static,
 {
     fn from_request(req: Req, state: Arc<S>) -> FRFut<Self> {
-        let (parts, _) = req.into_parts();
+        let (mut parts, _) = req.into_parts();
         Box::pin(async move {
-            T::from_request_parts(&parts, state).await
+            T::from_request_parts(&mut parts, state).await
         })
     }
 }
 
 impl FromRequestParts for HeaderMap {
-    fn from_request_parts(req: &Parts, _state: Arc<()>) -> FRFut<Self> {
+    fn from_request_parts(req: &mut Parts, _state: Arc<()>) -> FRFut<Self> {
         let headers = req.headers.clone();
         Box::pin(async move {
             headers 

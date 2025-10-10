@@ -58,6 +58,18 @@ where
     }
 }
 
+impl<F, A> FnOnceTuple<A> for Arc<F>
+where
+    F: FnOnceTuple<A> + Clone,
+{
+    type Output = <F as FnOnceTuple<A>>::Output;
+
+    fn call(self, args: A) -> Self::Output {
+        let f: F = (&*self).clone();
+        f.call(args)
+    }
+}
+
 macro_rules! impl_fn_once_tuple_all {
     () => {
         impl_fn_once_tuple!(A);
@@ -116,7 +128,7 @@ impl<S> FromRequestParts<S> for ()
 where
     S: Send + Sync + 'static,
 {
-    fn from_request_parts(_req: &Parts, _state: Arc<S>) -> FRFut<Self> {
+    fn from_request_parts(_req: &mut Parts, _state: Arc<S>) -> FRFut<Self> {
         Box::pin(async move { () })
     }
 }
@@ -134,7 +146,7 @@ macro_rules! impl_from_request_parts_tuple {
             S: Send + Sync + 'static,
             $( $name: FromRequestParts<S> + Send + 'static, )+
         {
-            fn from_request_parts<'a>(parts: &'a Parts, state: Arc<S>) -> FRPFut<'a, Self> {
+            fn from_request_parts<'a>(parts: &'a mut Parts, state: Arc<S>) -> FRPFut<'a, Self> {
                 Box::pin(async move {
                     (
                         $(

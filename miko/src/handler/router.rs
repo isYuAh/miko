@@ -8,6 +8,7 @@ use miko_core::{encode_route, IntoMethods};
 use tower::{util::BoxCloneService, Layer, Service};
 
 use crate::handler::{extractor::{from_request::FromRequest, path_params::PathParams}, handler::{FnOnceTuple, Handler, Req, Resp, TypedHandler}, into_response::IntoResponse};
+use crate::handler::nested_handler::NestedHandler;
 
 macro_rules! define_method {
     ($name:ident, $m:ident) => {
@@ -35,14 +36,13 @@ macro_rules! define_method {
       }
     }
 }
-type HttpReq = Request<Incoming>;
-type HttpSvc = BoxCloneService<HttpReq, Resp, Infallible>;
-// #[derive(Clone)]
+pub type HttpReq = Request<Incoming>;
+pub type HttpSvc = BoxCloneService<HttpReq, Resp, Infallible>;
 pub struct Router<S = ()> {
   pub routes: HashMap<Method, MRouter<Arc<dyn Handler>>>,
   pub state: Arc<S>,
   layers: Vec<Box<dyn Fn(HttpSvc) -> HttpSvc + Send + Sync>>,
-  path_map: HashMap<Method, HashMap<String, Arc<dyn Handler>>>
+  pub path_map: HashMap<Method, HashMap<String, Arc<dyn Handler>>>
 }
 
 impl<S: Send + Sync + 'static> Router<S> {
@@ -54,7 +54,8 @@ impl<S: Send + Sync + 'static> Router<S> {
           let handler = matched.value.clone();
           handler.call(req).await.into_response()
         }
-        Err(_) => {
+        Err(_e) => {
+            println!("Not Found: {} {:?}", path, _e);
           hyper::Response::builder()
             .status(hyper::StatusCode::NOT_FOUND)
             .body(Full::new(Bytes::from("Not Found")).boxed())
@@ -88,7 +89,6 @@ impl Router {
     Self {
       routes: HashMap::new(),
       state: Arc::new(()),
-      // svc_builder: ServiceBuilder::new()
       layers: Vec::new(),
       path_map: HashMap::new(),
     }
@@ -182,15 +182,17 @@ impl<S: Send + Sync + 'static> Router<S> {
 
       for (method, _) in other.routes.drain() {
           for (path, handler) in other.path_map.get(&method).unwrap().iter() {
+              let handler = handler.clone();
+              let new_handler = Arc::new(NestedHandler::new_erased(handler.clone(), &prefix, self.state.clone()));
               let new_path = format!("{}{}", prefix, path);
               self.routes
                 .entry(method.clone())
                 .or_insert_with(|| MRouter::new())
-                .insert(&new_path, handler.clone()).unwrap();
+                .insert(&new_path, new_handler.clone()).unwrap();
               self.path_map
                 .entry(method.clone())
                 .or_insert_with(|| HashMap::new())
-                .insert(new_path, handler.clone());
+                .insert(new_path, new_handler.clone());
           }
       }
       self

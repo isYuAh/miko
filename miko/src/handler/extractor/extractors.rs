@@ -3,11 +3,13 @@ use http_body_util::BodyExt;
 use hyper::http::request::Parts;
 use serde::de::DeserializeOwned;
 use crate::handler::{extractor::from_request::{FRFut, FromRequest, FromRequestParts}, handler::{Req}};
+use crate::handler::extractor::from_request::FRPFut;
+use crate::handler::extractor::path_params::PathParams;
 
 pub struct Json<T>(pub T);
 pub struct Query<T>(pub T);
 pub struct Path<T>(pub T);
-pub struct State<T>(pub T);
+pub struct State<T>(pub Arc<T>);
 
 impl<T> FromRequest for Json<T>
 where T: DeserializeOwned + Send + Sync + 'static {
@@ -24,7 +26,7 @@ where T: DeserializeOwned + Send + Sync + 'static {
 
 impl<T> FromRequestParts for Query<T>
 where T: DeserializeOwned + Send + Sync + 'static {
-    fn from_request_parts(req: &Parts, _state: Arc<()>) -> FRFut<Self> {
+    fn from_request_parts(req: &mut Parts, _state: Arc<()>) -> FRFut<Self> {
         let query = req.uri.query().unwrap_or("");
         let query = serde_urlencoded::from_str(query).unwrap();
         Box::pin(async move {
@@ -33,11 +35,22 @@ where T: DeserializeOwned + Send + Sync + 'static {
     }
 }
 
-impl<T: Clone> FromRequestParts<T> for State<T>
-where T: DeserializeOwned + Send + Sync + 'static {
-    fn from_request_parts(_: &Parts, _state: Arc<T>) -> FRFut<Self> {
+impl<T> FromRequestParts for Path<T>
+where T: From<String> + std::marker::Send + Sync + 'static
+{
+    fn from_request_parts(req: &mut Parts, _state: Arc<()>) -> FRFut<Self> {
+        let pp = req.extensions.get_mut::<PathParams>().unwrap();
+        let path = pp.0.remove(0).1.clone();
         Box::pin(async move {
-            State(_state.as_ref().clone())
+            Path(path.into())
+        })
+    }
+}
+
+impl<S: Send + Sync + 'static> FromRequestParts<S> for State<S> {
+    fn from_request_parts(_req: &mut Parts, state: Arc<S>) -> FRPFut<Self> {
+        Box::pin(async move {
+            State(state.clone())
         })
     }
 }
