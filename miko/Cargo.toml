@@ -25,6 +25,7 @@ miko-macros = { workspace = true }
 hyper = {version = "1.7.0", features = ["server", "http1"]}
 hyper-util = {version = "0.1.17", features = ["full"]}
 toml = "0.9.7"
+anyhow = "1.0.100"
 
 [features]
 full = ["inner_log"]

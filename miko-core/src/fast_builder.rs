@@ -9,6 +9,7 @@ impl ResponseBuilder {
     pub fn not_found() -> Result<Response<BoxBody<Bytes, Infallible>>, Infallible> {
         Response::builder()
             .status(404)
+            .header("Content-Type", "text/plain;charset=utf-8")
             .body(box_str_resp("Not Found".to_string())).map_err(|_| unreachable!())
     }
     
@@ -19,12 +20,14 @@ impl ResponseBuilder {
         };
         Response::builder()
             .status(500)
+            .header("Content-Type", "text/plain;charset=utf-8")
             .body(box_str_resp(msg)).map_err(|_| unreachable!())
     }
     
     pub fn ok(body: String) -> Result<Response<BoxBody<Bytes, Infallible>>, Infallible> {
         Response::builder()
             .status(200)
+            .header("Content-Type", "text/plain;charset=utf-8")
             .body(box_str_resp(body)).map_err(|_| unreachable!())
     }
 
@@ -35,6 +38,7 @@ impl ResponseBuilder {
         };
         Response::builder()
             .status(400)
+            .header("Content-Type", "text/plain;charset=utf-8")
             .body(box_str_resp(msg)).map_err(|_| unreachable!())
     }
 }

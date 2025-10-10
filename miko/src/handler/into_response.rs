@@ -3,7 +3,7 @@ use futures::{Stream, StreamExt};
 use http_body_util::{BodyExt, Full, StreamBody};
 use hyper::{body::Frame, Response};
 use serde::Serialize;
-
+use miko_core::fast_builder::ResponseBuilder;
 use crate::handler::handler::{Resp, RespBody};
 pub trait IntoResponse {
   fn into_response(self) -> Resp;
@@ -15,13 +15,13 @@ fn bytes_to_boxed(bytes: Bytes) -> RespBody {
 
 impl IntoResponse for String {
   fn into_response(self) -> Resp {
-      Response::new(bytes_to_boxed(Bytes::from(self)))
+      ResponseBuilder::ok(self).unwrap()
   }
 }
 
 impl IntoResponse for &'static str {
   fn into_response(self) -> Resp {
-      Response::new(bytes_to_boxed(Bytes::from(self)))
+      ResponseBuilder::ok(self.to_string()).unwrap()
   }
 }
 
@@ -66,16 +66,33 @@ where
   }
 }
 
-// impl<S, E> IntoResponse for StreamBody<S>
-// where S: Stream<Item = Result<Bytes, E>> + Send + 'static,
-//       E: std::fmt::Debug + Send + 'static,
-// {
-//     fn into_response(self) -> Resp {
-//       let body = StreamBody::new(self);
-//       Response::builder()
-//         .status(200)
-//         .header("content-type", "application/octet-stream")
-//         .body(self.boxed())
-//         .unwrap()
-//     }
-// }
+impl IntoResponse for anyhow::Error {
+  fn into_response(self) -> Resp {
+    #[cfg(feature = "inner_log")]
+    tracing::error!("{}", self);
+    Response::builder()
+      .status(500)
+      .header("content-type", "text/plain;charset=utf-8")
+      .body(bytes_to_boxed(Bytes::from(format!("Internal Server Error: {}", self))))
+      .unwrap()
+  }
+}
+
+impl<T, E> IntoResponse for Result<T, E>
+where
+    T: IntoResponse,
+    E: IntoResponse,
+{
+  fn into_response(self) -> Resp {
+    match self {
+      Ok(t) => t.into_response(),
+      Err(e) => e.into_response(),
+    }
+  }
+}
+
+impl IntoResponse for () {
+  fn into_response(self) -> Resp {
+    ResponseBuilder::ok("".to_string()).unwrap()
+  }
+}
