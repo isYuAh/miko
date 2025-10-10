@@ -3,12 +3,13 @@ use std::convert::Infallible;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
-
+use std::task::{Context, Poll};
 use bytes::Bytes;
 use http_body_util::combinators::BoxBody;
 use hyper::{Request, Response};
 use hyper::http::request::Parts;
-
+use tower::Service;
+use tower::util::BoxCloneService;
 use crate::handler::extractor::from_request::{FRFut, FRPFut};
 use crate::handler::{extractor::from_request::FromRequestParts, into_response::IntoResponse, extractor::from_request::FromRequest};
 pub type RespBody = BoxBody<Bytes, Infallible>;
@@ -134,6 +135,8 @@ where
 }
 
 pub use __extract_kind::{PartsTag, ReqTag};
+use crate::handler::router::HttpSvc;
+
 mod __extract_kind {
     pub enum PartsTag {}
     pub enum ReqTag {}
@@ -221,3 +224,34 @@ macro_rules! impl_from_request_tuple_all {
 }
 
 impl_from_request_tuple_all!();
+
+pub type DynHandler = Arc<dyn Handler + Send + Sync>;
+
+#[derive(Clone)]
+pub struct HandlerSvc {
+    inner: DynHandler
+}
+impl HandlerSvc {
+    pub fn new(inner: DynHandler) -> Self {
+        Self { inner }
+    }
+}
+
+impl Service<Req> for HandlerSvc {
+    type Response = Resp;
+    type Error = Infallible;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    fn call(&mut self, req: Req) -> Self::Future {
+        let h = self.inner.clone();
+        Box::pin(async move {
+            Ok(h.call(req).await)
+        })
+    }
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+}
+pub fn handler_to_svc(h: DynHandler) -> HttpSvc<Req> {
+    let svc = HandlerSvc::new(h);
+    BoxCloneService::new(svc)
+}

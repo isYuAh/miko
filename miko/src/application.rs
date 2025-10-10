@@ -7,56 +7,41 @@ use tokio::net::{TcpListener, TcpStream};
 use tracing;
 use tokio::io::Result as IoResult;
 
-use crate::{config::config::ApplicationConfig, handler::{into_response::IntoResponse, router::{ArcRouter, Router}}};
-pub struct Application<S = ()> {
+use crate::{config::config::ApplicationConfig, handler::{into_response::IntoResponse, router::{Router}}};
+use crate::handler::handler::Req;
+use crate::handler::incoming_to_req::IncomingToInternal;
+use crate::handler::router::HttpSvc;
+
+pub struct Application {
   config: ApplicationConfig,
-  router: ArcRouter<S>,
+  svc: HttpSvc<Req>,
 }
 
-impl<S> Application<S> {
-  pub fn new(config: ApplicationConfig, router: Router<S>) -> Arc<Self> {
-    Arc::new(Self { config, router: ArcRouter(Arc::new(router)) })
+impl Application {
+  pub fn new<S: Send + Sync + 'static>(config: ApplicationConfig, router: Router<S>) -> Arc<Self> {
+    Arc::new(Self { config, svc: router.into_tower_service() })
   }
 
-  pub fn new_(router: Router<S>) -> Arc<Self> {
+  pub fn new_<S: Send + Sync + 'static>(router: Router<S>) -> Arc<Self> {
     Self::new(ApplicationConfig::load_().unwrap_or_default(), router)
   }
 }
 
-impl<S: Send + Sync + 'static> Application<S> {
-  pub async fn handle_connection(self: Arc<Self>, stream: TcpStream) -> IoResult<()> {
-    let io = TokioIo::new(stream);
-    let router = self.router.0.clone();
-    let service = service_fn(move |req: Request<Incoming>| {
-      let router = router.clone();
-      async move {
-        let method = req.method().clone();
-        let path = req.uri().path().to_string();
-        let body_boxed = req.map(|b| b.map_err(|_| unreachable!()).boxed());
-        let resp = router.handle(&method, &path, body_boxed).await;
-        Ok::<_, Infallible>(resp.into_response())
-      }
-    });
-    http1::Builder::new()
-      .serve_connection(io, service)
-      .await
-      .map_err(|e| tokio::io::Error::new(tokio::io::ErrorKind::Other, e))?;
-    Ok(())
-  }
-
+impl Application {
   pub async fn run(self: Arc<Self>) -> IoResult<()> {
     let addr = format!("{}:{}", self.config.addr, self.config.port);
     let listener = TcpListener::bind(addr).await?;
     let executor = TokioExecutor::new();
-    let service = self.router.clone();
+    let service = self.svc.clone();
     #[cfg(feature = "inner_log")]
     tracing::info!("listening on {}", self.config.addr);
     loop {
       let builder = AutoBuilder::new(executor.clone());
       let (stream, _) = listener.accept().await?;
       let io = TokioIo::new(stream);
-      let service = service.clone();
-      let service = TowerToHyperService::new(service);
+      let service = TowerToHyperService::new(IncomingToInternal {
+        inner: service.clone()
+      });
       tokio::spawn(async move {
         if let Err(_e) = builder.serve_connection(io, service).await {
           #[cfg(feature = "inner_log")]

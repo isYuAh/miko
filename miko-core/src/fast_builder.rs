@@ -42,3 +42,7 @@ impl ResponseBuilder {
 fn box_str_resp (str: String) -> BoxBody<Bytes, Infallible> {
     Full::new(Bytes::from(str)).boxed()
 }
+
+pub fn map_err_to_500(err: anyhow::Error) -> Result<Response<BoxBody<Bytes, Infallible>>, Infallible> {
+    return ResponseBuilder::internal_server_error(Some(err.to_string()));
+}

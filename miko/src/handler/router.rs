@@ -1,14 +1,15 @@
-use std::{collections::HashMap, convert::Infallible, ops::Deref, pin::Pin, sync::Arc, task::{Context, Poll}};
+use std::{collections::HashMap, convert::Infallible, sync::Arc};
 
+use crate::handler::handler::{handler_to_svc, DynHandler};
+use crate::handler::nested_handler::NestLayer;
+use crate::handler::router_svc::RouterSvc;
+use crate::handler::{extractor::{from_request::FromRequest, path_params::PathParams}, handler::{FnOnceTuple, Req, Resp, TypedHandler}, into_response::IntoResponse};
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::{body::Incoming, Method, Request};
 use matchit::Router as MRouter;
 use miko_core::{encode_route, IntoMethods};
 use tower::{util::BoxCloneService, Layer, Service};
-
-use crate::handler::{extractor::{from_request::FromRequest, path_params::PathParams}, handler::{FnOnceTuple, Handler, Req, Resp, TypedHandler}, into_response::IntoResponse};
-use crate::handler::nested_handler::NestedHandler;
 
 macro_rules! define_method {
     ($name:ident, $m:ident) => {
@@ -22,37 +23,64 @@ macro_rules! define_method {
       {
         let handler = Arc::new(
           TypedHandler::new(handler, self.state.clone())
-        ) as Arc<dyn Handler>;
+        ) as DynHandler;
         self.routes
             .entry(Method::$m)
             .or_insert_with(|| MRouter::new())
-            .insert(encode_route(path), handler.clone())
+            .insert(encode_route(path), handler_to_svc(handler.clone()))
             .unwrap();
         self.path_map
           .entry(Method::$m)
           .or_insert_with(|| HashMap::new())
-          .insert(path.to_string(), handler.clone());
+          .insert(path.to_string(), handler_to_svc(handler.clone()));
         self
       }
     }
 }
 pub type HttpReq = Request<Incoming>;
-pub type HttpSvc = BoxCloneService<HttpReq, Resp, Infallible>;
+pub type HttpSvc<T = HttpReq> = BoxCloneService<T, Resp, Infallible>;
+
 pub struct Router<S = ()> {
-  pub routes: HashMap<Method, MRouter<Arc<dyn Handler>>>,
+  pub routes: HashMap<Method, MRouter<HttpSvc<Req>>>,
   pub state: Arc<S>,
-  layers: Vec<Box<dyn Fn(HttpSvc) -> HttpSvc + Send + Sync>>,
-  pub path_map: HashMap<Method, HashMap<String, Arc<dyn Handler>>>
+  pub layers: Vec<Arc<dyn Fn(HttpSvc<Req>) -> HttpSvc<Req> + Send + Sync>>,
+  pub path_map: HashMap<Method, HashMap<String, HttpSvc<Req>>>
+}
+impl<S> Clone for Router<S> {
+    fn clone(&self) -> Self {
+        Self {
+            routes: self.routes.clone(),
+            state: self.state.clone(),
+            layers: self.layers.clone(),
+            path_map: self.path_map.clone(),
+        }
+    }
 }
 
 impl<S: Send + Sync + 'static> Router<S> {
+    pub fn find_handler(&self, method: &Method, path: &str) -> Option<(HttpSvc<Req>, PathParams)> {
+        if let Some(router) = self.routes.get(method) {
+            match router.at(path) {
+                Ok(matched) => {
+                    let handler = matched.value.clone();
+                    Some((handler, PathParams::from(&matched.params)))
+                }
+                Err(_e) => {
+                    println!("Not Found: {} {:?}", path, _e);
+                    None
+                }
+            }
+        } else {
+            None
+        }
+    }
   pub async fn handle(&self, method: &Method, path: &str, mut req: Req) -> Resp {
     if let Some(router) = self.routes.get(method) {
       match router.at(path) {
         Ok(matched) => {
           req.extensions_mut().insert(PathParams::from(&matched.params));
-          let handler = matched.value.clone();
-          handler.call(req).await.into_response()
+          let mut handler = matched.value.clone();
+          handler.call(req).await.map_err(|_| unreachable!()).unwrap().into_response()
         }
         Err(_e) => {
             println!("Not Found: {} {:?}", path, _e);
@@ -69,19 +97,6 @@ impl<S: Send + Sync + 'static> Router<S> {
         .unwrap()
     }
   }
-}
-
-pub struct ArcRouter<S>(pub Arc<Router<S>>);
-impl<S> Deref for ArcRouter<S> {
-  type Target = Router<S>;
-  fn deref(&self) -> &Self::Target {
-    &self.0
-  }
-}
-impl<S> Clone for ArcRouter<S> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
 }
 
 impl Router {
@@ -107,17 +122,17 @@ impl<S: Send + Sync + 'static> Router<S> {
   {
     let handler = Arc::new(
       TypedHandler::new(handler, self.state.clone())
-    ) as Arc<dyn Handler>;
+    ) as DynHandler;
     for m in method.into_methods() {
       self.routes
         .entry(m.clone())
         .or_insert_with(|| MRouter::new())
-        .insert(encode_route(path), handler.clone())
+        .insert(encode_route(path), handler_to_svc(handler.clone()))
         .unwrap();
       self.path_map
         .entry(m.clone())
         .or_insert_with(|| HashMap::new())
-        .insert(path.to_string(), handler.clone());
+        .insert(path.to_string(), handler_to_svc(handler.clone()));
     }
     self
   }
@@ -131,30 +146,6 @@ impl<S: Send + Sync + 'static> Router<S> {
   define_method!(trace, TRACE);
   define_method!(connect, CONNECT);
   define_method!(patch, PATCH);
-}
-
-impl<S: Send + Sync + 'static> tower::Service<Request<Incoming>> for ArcRouter<S> {
-    type Response = Resp;
-    type Error = Infallible;
-    type Future = Pin<Box<dyn Future<Output = Result<Resp, Infallible>> + Send>>;
-
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, req_incoming: Request<Incoming>) -> Self::Future {
-        let router = self.0.clone();
-        Box::pin(async move {
-            let method = &req_incoming.method().clone();
-            let path = &req_incoming.uri().path().to_string();
-
-            let req: Req = req_incoming
-                .map(|inc| inc.map_err(|_| unreachable!()).boxed());
-
-            let resp = router.handle(method, path, req).await;
-            Ok(resp)
-        })
-    }
 }
 
 impl<S: Send + Sync + 'static> Router<S> {
@@ -181,18 +172,18 @@ impl<S: Send + Sync + 'static> Router<S> {
       let prefix = prefix.trim_end_matches('/').to_string();
 
       for (method, _) in other.routes.drain() {
-          for (path, handler) in other.path_map.get(&method).unwrap().iter() {
-              let handler = handler.clone();
-              let new_handler = Arc::new(NestedHandler::new_erased(handler.clone(), &prefix, self.state.clone()));
+          for (path, svc) in other.path_map.get_mut(&method).unwrap().drain() {
+              let layered = NestLayer::new(&prefix).layer(svc);
+              let boxed: HttpSvc<Req> = BoxCloneService::new(layered);
               let new_path = format!("{}{}", prefix, path);
               self.routes
                 .entry(method.clone())
                 .or_insert_with(|| MRouter::new())
-                .insert(&new_path, new_handler.clone()).unwrap();
+                .insert(&new_path, boxed.clone()).unwrap();
               self.path_map
                 .entry(method.clone())
                 .or_insert_with(|| HashMap::new())
-                .insert(new_path, new_handler.clone());
+                .insert(new_path, boxed.clone());
           }
       }
       self
@@ -200,22 +191,22 @@ impl<S: Send + Sync + 'static> Router<S> {
 
   pub fn with_service<L>(mut self, layer: L) -> Self
   where
-    L: Layer<HttpSvc> + Send + Sync + 'static,
-    L::Service: Service<HttpReq, Response = Resp, Error = Infallible> + Clone + Send + 'static,
-    <L::Service as Service<HttpReq>>::Future: Send + 'static,
+    L: Layer<HttpSvc<Req>> + Send + Sync + 'static,
+    L::Service: Service<Req, Response = Resp, Error = Infallible> + Clone + Send + 'static,
+    <L::Service as Service<Req>>::Future: Send + 'static,
   {
-    self.layers.push(Box::new(move |svc: HttpSvc| {
+    self.layers.push(Arc::new(move |svc: HttpSvc<Req>| {
         let wrapped = layer.layer(svc);
         BoxCloneService::new(wrapped)
     }));
     self
   }
 
-  pub fn into_tower_service(mut self) -> HttpSvc {
+  pub fn into_tower_service(mut self) -> HttpSvc<Req> {
     let layers = std::mem::take(&mut self.layers);
-    let mut svc: HttpSvc = BoxCloneService::new(ArcRouter(Arc::new(self)));
+    let mut svc: HttpSvc<Req> = BoxCloneService::new(RouterSvc {router: self });
     for apply in layers {
-        svc = (apply)(svc);
+        svc = apply(svc);
     }
     svc
   }
