@@ -1,5 +1,5 @@
 use std::{collections::HashMap, convert::Infallible, sync::Arc};
-
+use std::path::PathBuf;
 use crate::handler::handler::{handler_to_svc, DynHandler};
 use crate::handler::nested_handler::NestLayer;
 use crate::handler::router_svc::RouterSvc;
@@ -10,6 +10,7 @@ use hyper::{body::Incoming, Method, Request};
 use matchit::Router as MRouter;
 use miko_core::{encode_route, IntoMethods};
 use tower::{util::BoxCloneService, Layer, Service};
+use crate::ext::static_svc::StaticSvcBuilder;
 
 macro_rules! define_method {
     ($name:ident, $m:ident) => {
@@ -66,7 +67,6 @@ impl<S: Send + Sync + 'static> Router<S> {
                     Some((handler, PathParams::from(&matched.params)))
                 }
                 Err(_e) => {
-                    println!("Not Found: {} {:?}", path, _e);
                     None
                 }
             }
@@ -83,7 +83,6 @@ impl<S: Send + Sync + 'static> Router<S> {
           handler.call(req).await.map_err(|_| unreachable!()).unwrap().into_response()
         }
         Err(_e) => {
-            println!("Not Found: {} {:?}", path, _e);
           hyper::Response::builder()
             .status(hyper::StatusCode::NOT_FOUND)
             .body(Full::new(Bytes::from("Not Found")).boxed())
@@ -168,28 +167,54 @@ impl<S: Send + Sync + 'static> Router<S> {
     self
   }
 
-  pub fn nest(&mut self, prefix: &str, mut other: Router<S>) -> &mut Self {
-      let prefix = prefix.trim_end_matches('/').to_string();
+    pub fn nest<T>(&mut self, prefix: &str, mut other: Router<T>) -> &mut Self {
+        let prefix = prefix.trim_end_matches('/').to_string();
 
-      for (method, _) in other.routes.drain() {
-          for (path, svc) in other.path_map.get_mut(&method).unwrap().drain() {
-              let layered = NestLayer::new(&prefix).layer(svc);
-              let boxed: HttpSvc<Req> = BoxCloneService::new(layered);
-              let new_path = format!("{}{}", prefix, path);
-              self.routes
+        for (method, _) in other.routes.drain() {
+            for (path, svc) in other.path_map.get_mut(&method).unwrap().drain() {
+                let layered = NestLayer::new(&prefix).layer(svc);
+                let boxed: HttpSvc<Req> = BoxCloneService::new(layered);
+                let new_path = format!("{}{}", prefix, path);
+                self.routes
+                    .entry(method.clone())
+                    .or_insert_with(|| MRouter::new())
+                    .insert(&new_path, boxed.clone()).unwrap();
+                self.path_map
+                    .entry(method.clone())
+                    .or_insert_with(|| HashMap::new())
+                    .insert(new_path, boxed.clone());
+            }
+        }
+        self
+    }
+
+    pub fn nest_service(&mut self, prefix: &str, svc: HttpSvc<Req>) {
+        let prefix = prefix.trim_end_matches('/').to_string();
+        let layered = NestLayer::new(&prefix).layer(svc);
+        let boxed: HttpSvc<Req> = BoxCloneService::new(layered);
+        let methods = [
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::PATCH,
+            Method::HEAD,
+            Method::OPTIONS,
+        ];
+        let new_path = format!("{}{}", prefix, "/{*rest}");
+        for method in methods {
+            self.routes
                 .entry(method.clone())
                 .or_insert_with(|| MRouter::new())
                 .insert(&new_path, boxed.clone()).unwrap();
-              self.path_map
+            self.path_map
                 .entry(method.clone())
                 .or_insert_with(|| HashMap::new())
-                .insert(new_path, boxed.clone());
-          }
-      }
-      self
-  }
+                .insert(new_path.clone(), boxed.clone());
+        }
+    }
 
-  pub fn with_service<L>(mut self, layer: L) -> Self
+  pub fn with_layer<L>(mut self, layer: L) -> Self
   where
     L: Layer<HttpSvc<Req>> + Send + Sync + 'static,
     L::Service: Service<Req, Response = Resp, Error = Infallible> + Clone + Send + 'static,
@@ -219,4 +244,19 @@ impl<S: Send + Sync + 'static> Router<S> {
       path_map: HashMap::new(),
     })
   }
+}
+
+#[cfg(feature = "ext")]
+impl<S: Send + Sync + 'static> Router<S> {
+    pub fn static_svc<F>(&mut self, prefix: &str, root: impl Into<PathBuf>, option_closure: Option<F>)
+    where F: FnOnce(StaticSvcBuilder) -> StaticSvcBuilder
+    {
+        let builder = StaticSvcBuilder::new(root);
+        let builder = if let Some(option_closure) = option_closure {
+            option_closure(builder)
+        } else {
+            builder
+        };
+        self.nest_service(prefix, builder.build())
+    }
 }

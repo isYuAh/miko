@@ -1,4 +1,5 @@
 use std::convert::Infallible;
+use anyhow::{Error};
 use bytes::Bytes;
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Full};
@@ -46,7 +47,14 @@ impl ResponseBuilder {
 fn box_str_resp (str: String) -> BoxBody<Bytes, Infallible> {
     Full::new(Bytes::from(str)).boxed()
 }
+pub fn box_empty_body() -> BoxBody<Bytes, Infallible> {
+    Full::new(Bytes::new()).boxed()
+}
 
-pub fn map_err_to_500(err: anyhow::Error) -> Result<Response<BoxBody<Bytes, Infallible>>, Infallible> {
+pub fn map_err_to_500(err: Error) -> Result<Response<BoxBody<Bytes, Infallible>>, Infallible> {
     ResponseBuilder::internal_server_error(Some(err.to_string()))
+}
+
+pub fn boxed_err<T>(err: Error) -> std::pin::Pin<Box<dyn Future<Output = Result<T, Error>> + Send + 'static>> {
+    Box::pin(async move {Err(err)})
 }

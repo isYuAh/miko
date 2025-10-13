@@ -21,16 +21,23 @@ tokio = { version = "1.47.1", features = ["full"] }
 tower = {version = "0.5.2", features = ["util", "make"]}
 tracing = "0.1.41"
 miko-core = { workspace = true }
-miko-macros = { workspace = true }
+miko-macros = { workspace = true, optional = true }
 hyper = {version = "1.7.0", features = ["server", "http1"]}
 hyper-util = {version = "0.1.17", features = ["full"]}
 toml = "0.9.7"
 anyhow = "1.0.100"
+inventory = {version =  "0.3.21", optional = true }
+multer = "3.1.0"
+tower-http = { version = "0.6.6", optional = true, features = ["cors"] }
+httpdate = {version =  "1.0.3", optional = true }
+tokio-util = "0.7.16"
 
 [features]
-full = ["inner_log"]
+full = ["inner_log", "macro", "auto", "ext"]
 inner_log = []
-
+macro = ["miko-macros"]
+auto = ["macro", "miko-macros/auto", "inventory"]
+ext = ["tower-http", "httpdate"]
 
 [[example]]
 name = "demo"

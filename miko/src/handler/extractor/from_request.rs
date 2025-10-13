@@ -15,8 +15,8 @@ pub trait FromRequestParts<S = ()>: Send + Sync + 'static {
   where Self: Sized;
 }
 
-impl FromRequest for Req {
-    fn from_request(req: Req, _state: Arc<()>) -> FRFut<Self> {
+impl<S> FromRequest<S> for Req {
+    fn from_request(req: Req, _state: Arc<S>) -> FRFut<Self> {
       Box::pin(async move {
           Ok(req)
       })
@@ -36,8 +36,8 @@ where
     }
 }
 
-impl FromRequestParts for HeaderMap {
-    fn from_request_parts(req: &mut Parts, _state: Arc<()>) -> FRFut<Self> {
+impl<S> FromRequestParts<S> for HeaderMap {
+    fn from_request_parts(req: &mut Parts, _state: Arc<S>) -> FRFut<Self> {
         let headers = req.headers.clone();
         Box::pin(async move {
             Ok(headers)
@@ -60,11 +60,12 @@ where
     }
 }
 
-impl<T> FromRequest for Option<T>
+impl<S, T> FromRequest<S> for Option<T>
 where
-    T: FromRequest + Send + 'static,
+    S: Send + Sync + 'static,
+    T: FromRequest<S> + Send + 'static,
 {
-    fn from_request(req: Req, state: Arc<()>) -> FRFut<Self> {
+    fn from_request(req: Req, state: Arc<S>) -> FRFut<Self> {
         Box::pin(async move {
             match T::from_request(req, state).await {
                 Ok(v)  => Ok(Some(v)),

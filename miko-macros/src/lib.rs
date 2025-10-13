@@ -1,17 +1,56 @@
-// use miko_core::IntoMethods;
-// use proc_macro::TokenStream;
-// use quote::quote;
-// use syn::parse_macro_input;
-
-// use crate::route::RouteAttr;
+use proc_macro::{TokenStream};
+use proc_macro2::{Ident, Span};
+use quote::{quote};
+use syn::{parse_macro_input, parse_quote, Stmt};
+use crate::extractor::body::deal_with_body_attr;
+use crate::extractor::path::deal_with_path_attr;
+use crate::toolkit::exactors::build_struct_from_query;
+use crate::toolkit::rout_arg::{FnArgResult, IntoFnArgs, RouteFnArg};
 
 mod toolkit;
 mod route;
+mod extractor;
 
-// #[proc_macro_attribute]
-// pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
-//   let args = parse_macro_input!(attr as RouteAttr);
-//   let path = args.path;
-//   let methods = args.method.unwrap_or("get".to_string()).into_methods();
-//   quote! {}.into()
-// }
+#[proc_macro_attribute]
+pub fn route(_attr: TokenStream, item: TokenStream) -> TokenStream {
+  let mut fn_item = parse_macro_input!(item as syn::ItemFn);
+  let fn_name = fn_item.sig.ident.to_string();
+  // 自动返回值
+  let sig = &mut fn_item.sig;
+  if matches!(sig.output,syn::ReturnType::Default) {
+    (*sig).output = parse_quote!(-> impl ::miko::handler::into_response::IntoResponse)
+  }
+  let mut inject_segs: Vec<Stmt> = Vec::new();
+  let rfa = RouteFnArg::from_punctuated(&mut sig.inputs);
+  let path_inputs = rfa.gen_fn_args(deal_with_path_attr);
+  let body_inputs = rfa.gen_fn_args(deal_with_body_attr);
+  let plain_inputs = rfa.gen_fn_args(|rfa| if rfa.mark.is_empty() { FnArgResult::Keep } else { FnArgResult::Remove });
+  // 清空参数
+  sig.inputs.clear();
+  // 获取无修饰参数
+  // 组装path
+  sig.inputs.extend(path_inputs);
+  // 构建 Query 结构体和解构提取器
+  let q_struct_ident = Ident::new(&format!("__{}_QueryStruct", fn_name), Span::call_site());
+  // 重组Query
+  let (q_struct, q_struct_exactor) = build_struct_from_query(&rfa, q_struct_ident);
+  if q_struct.is_some() {
+    sig.inputs.push(q_struct_exactor.unwrap());
+  }
+  // 组装plain_inputs
+  sig.inputs.extend(plain_inputs);
+  // 最后组装body
+  sig.inputs.extend(body_inputs);
+  // 展开
+  let block = &fn_item.block.clone();
+  quote! {
+    #q_struct
+
+    #sig {
+      #(#inject_segs)*
+      #block
+    }
+
+
+  }.into()
+}
