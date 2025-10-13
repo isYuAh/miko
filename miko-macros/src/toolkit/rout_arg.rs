@@ -37,10 +37,22 @@ impl RouteFnArg {
                     let mut mark = HashMap::new();
                     let ident = match &*pat.pat {
                         syn::Pat::Ident(pat_ident) => Some(pat_ident.ident.clone()),
+                        syn::Pat::TupleStruct(pat_ts) => {
+                            let mut pat_ts = pat_ts.clone();
+                            while let Some(syn::Pat::TupleStruct(pat_tsn)) = pat_ts.elems.first() {
+                                pat_ts = pat_tsn.clone();
+                            }
+                            if let syn::Pat::Ident(pat_ident) = pat_ts.elems.first().unwrap() {
+                                Some(pat_ident.ident.clone())
+                            } else {
+                                None
+                            }
+                        },
                         _ => None
                     };
                     let (is_option, _option_ty) = is_option(&pat.ty);
                     if ident.is_none() {
+                        panic!("{:?}", pat.pat.to_token_stream().to_string());
                         panic!("RouteFnArg must have an ident");
                     }
                     for attr in &pat.attrs {

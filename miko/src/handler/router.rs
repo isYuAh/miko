@@ -153,7 +153,7 @@ impl<S: Send + Sync + 'static> Router<S> {
     Router { routes: self.routes, state: Arc::new(state), layers: self.layers, path_map: self.path_map }
   }
 
-  pub fn merge(&mut self, other: Self) -> &mut Self {
+  pub fn merge<T>(&mut self, other: Router<T>) -> &mut Self {
     for (method, router) in other.routes {
       self.routes
         .entry(method.clone())

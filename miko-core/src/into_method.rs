@@ -8,7 +8,7 @@ pub trait IntoMethods {
 
 impl IntoMethods for &str {
   fn into_methods(self) -> Vec<Method> {
-    self.split(",").map(|m| Method::from_str(m).unwrap()).collect::<Vec<_>>()
+    self.split(',').map(|m| Method::from_str(m.trim()).unwrap()).collect::<Vec<_>>()
   }
 }
 

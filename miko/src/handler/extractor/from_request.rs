@@ -69,7 +69,43 @@ where
         Box::pin(async move {
             match T::from_request(req, state).await {
                 Ok(v)  => Ok(Some(v)),
-                Err(_) => Ok(None),
+                Err(_e) => {
+                    Ok(None)
+                },
+            }
+        })
+    }
+}
+
+impl<S, T> FromRequest<S> for Result<T, anyhow::Error>
+where
+    S: Send + Sync + 'static,
+    T: FromRequest<S> + Send + 'static,
+{
+    fn from_request(req: Req, state: Arc<S>) -> FRFut<Self> {
+        Box::pin(async move {
+            match T::from_request(req, state).await {
+                Ok(v)  => Ok(Ok(v)),
+                Err(_e) => {
+                    Err(_e)
+                },
+            }
+        })
+    }
+}
+
+impl<S, T> FromRequestParts<S> for Result<T, anyhow::Error>
+where
+    S: Send + Sync + 'static,
+    T: FromRequestParts<S> + Send + 'static,
+{
+    fn from_request_parts(req: &mut Parts, state: Arc<S>) -> FRPFut<Self> {
+        Box::pin(async move {
+            match T::from_request_parts(req, state).await {
+                Ok(v)  => Ok(Ok(v)),
+                Err(_e) => {
+                    Err(_e)
+                },
             }
         })
     }

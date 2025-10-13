@@ -1,56 +1,64 @@
-use proc_macro::{TokenStream};
-use proc_macro2::{Ident, Span};
-use quote::{quote};
-use syn::{parse_macro_input, parse_quote, Stmt};
-use crate::extractor::body::deal_with_body_attr;
-use crate::extractor::path::deal_with_path_attr;
-use crate::toolkit::exactors::build_struct_from_query;
-use crate::toolkit::rout_arg::{FnArgResult, IntoFnArgs, RouteFnArg};
+use crate::route::core::route_handler;
+use crate::route::RouteAttr;
+use crate::toolkit::rout_arg::IntoFnArgs;
+use proc_macro::TokenStream;
+use quote::quote;
+use syn::{parse_macro_input, ItemFn};
 
 mod toolkit;
 mod route;
 mod extractor;
 
 #[proc_macro_attribute]
-pub fn route(_attr: TokenStream, item: TokenStream) -> TokenStream {
-  let mut fn_item = parse_macro_input!(item as syn::ItemFn);
-  let fn_name = fn_item.sig.ident.to_string();
-  // 自动返回值
-  let sig = &mut fn_item.sig;
-  if matches!(sig.output,syn::ReturnType::Default) {
-    (*sig).output = parse_quote!(-> impl ::miko::handler::into_response::IntoResponse)
-  }
-  let mut inject_segs: Vec<Stmt> = Vec::new();
-  let rfa = RouteFnArg::from_punctuated(&mut sig.inputs);
-  let path_inputs = rfa.gen_fn_args(deal_with_path_attr);
-  let body_inputs = rfa.gen_fn_args(deal_with_body_attr);
-  let plain_inputs = rfa.gen_fn_args(|rfa| if rfa.mark.is_empty() { FnArgResult::Keep } else { FnArgResult::Remove });
-  // 清空参数
-  sig.inputs.clear();
-  // 获取无修饰参数
-  // 组装path
-  sig.inputs.extend(path_inputs);
-  // 构建 Query 结构体和解构提取器
-  let q_struct_ident = Ident::new(&format!("__{}_QueryStruct", fn_name), Span::call_site());
-  // 重组Query
-  let (q_struct, q_struct_exactor) = build_struct_from_query(&rfa, q_struct_ident);
-  if q_struct.is_some() {
-    sig.inputs.push(q_struct_exactor.unwrap());
-  }
-  // 组装plain_inputs
-  sig.inputs.extend(plain_inputs);
-  // 最后组装body
-  sig.inputs.extend(body_inputs);
-  // 展开
-  let block = &fn_item.block.clone();
+pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
+  let args = parse_macro_input!(attr as RouteAttr);
+  let fn_item = parse_macro_input!(item as ItemFn);
+  route_handler(args, fn_item)
+}
+
+#[proc_macro_attribute]
+pub fn miko(_attr: TokenStream, item: TokenStream) -> TokenStream {
+  let input_fn = parse_macro_input!(item as ItemFn);
+  let user_statements = &input_fn.block.stmts;
   quote! {
-    #q_struct
+    #[::tokio::main]
+    async fn main() {
+      let mut router = Router::new();
 
-    #sig {
-      #(#inject_segs)*
-      #block
+      #( #user_statements )*
+
+      router.merge(::miko::auto::collect_global_router());
+      let app = ::miko::application::Application::new_(router.take());
+      app.run().await.unwrap();
     }
-
-
   }.into()
 }
+macro_rules! derive_route_macro {
+    ($macro_name: ident, $method_ident:ident) => {
+        #[proc_macro_attribute]
+        pub fn $macro_name(attr: TokenStream, item: TokenStream) -> TokenStream {
+            let mut args = syn::parse_macro_input!(attr as RouteAttr);
+            let fn_item = syn::parse_macro_input!(item as ItemFn);
+            let method_to_add = ::hyper::Method::$method_ident;
+            match &mut args.method {
+                Some(existing_methods) => {
+                    existing_methods.push(method_to_add);
+                }
+                None => {
+                    args.method = Some(vec![method_to_add]);
+                }
+            }
+            route_handler(args, fn_item)
+        }
+    };
+}
+
+derive_route_macro!(get, GET);
+derive_route_macro!(post, POST);
+derive_route_macro!(put, PUT);
+derive_route_macro!(delete, DELETE);
+derive_route_macro!(patch, PATCH);
+derive_route_macro!(head, HEAD);
+derive_route_macro!(options, OPTIONS);
+derive_route_macro!(trace, TRACE);
+derive_route_macro!(connect, CONNECT);

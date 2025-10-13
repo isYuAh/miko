@@ -11,7 +11,10 @@ use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
+use hyper::http::Extensions;
+use hyper::{Method, Uri};
 
+#[derive(Debug)]
 pub struct Json<T>(pub T);
 pub struct Query<T>(pub T);
 pub struct Path<T>(pub T);
@@ -149,6 +152,39 @@ impl<S> FromRequest<S> for Multipart
                 }
             }
             Ok(Multipart { fields: form, files })
+        })
+    }
+}
+
+impl<S> FromRequestParts<S> for Method {
+    fn from_request_parts(req: &mut Parts, state: Arc<S>) -> FRPFut<Self>
+    where
+        Self: Sized,
+    {
+        Box::pin(async move {
+            Ok(req.method.clone())
+        })
+    }
+}
+
+impl<S> FromRequestParts<S> for Extensions {
+    fn from_request_parts(req: &mut Parts, state: Arc<S>) -> FRPFut<Self>
+    where
+        Self: Sized,
+    {
+        Box::pin(async move {
+            Ok(req.extensions.clone())
+        })
+    }
+}
+
+impl<S> FromRequestParts<S> for Uri {
+    fn from_request_parts(req: &mut Parts, state: Arc<S>) -> FRPFut<Self>
+    where
+        Self: Sized,
+    {
+        Box::pin(async move {
+            Ok(req.uri.clone())
         })
     }
 }

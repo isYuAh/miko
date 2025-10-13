@@ -27,12 +27,13 @@ impl Application {
 
 impl Application {
   pub async fn run(self: Arc<Self>) -> IoResult<()> {
+
     let addr = format!("{}:{}", self.config.addr, self.config.port);
     let listener = TcpListener::bind(addr).await?;
     let executor = TokioExecutor::new();
     let service = self.svc.clone();
     #[cfg(feature = "inner_log")]
-    tracing::info!("listening on {}", self.config.addr);
+    tracing::info!("listening on {}:{}", self.config.addr, self.config.port);
     loop {
       let builder = AutoBuilder::new(executor.clone());
       let (stream, _) = listener.accept().await?;

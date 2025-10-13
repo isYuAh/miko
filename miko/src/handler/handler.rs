@@ -192,6 +192,20 @@ macro_rules! impl_from_request_tuple {
     };
 }
 
+impl <S, A> FromRequest<S> for (A,) where
+    S: Send + Sync + 'static,
+    A: FromRequest<S> + Send + 'static,
+{
+    fn from_request(req: Req, state: Arc<S>) -> FRFut<Self> {
+        Box::pin(async move {
+            let (mut parts, body) = req.into_parts();
+            let req = Req::from_parts(parts, body);
+            let a = A::from_request(req, state).await?;
+            Ok((a,))
+        })
+    }
+}
+
 macro_rules! impl_from_request_tuple_all {
     () => {
         impl_from_request_parts_tuple!(A);

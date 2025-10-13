@@ -1,4 +1,8 @@
+pub mod core;
+
 use hyper::Method;
+use proc_macro2::{Ident, TokenStream};
+use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use miko_core::IntoMethods;
 use crate::toolkit::attr::StrAttrMap;
@@ -21,5 +25,25 @@ impl Parse for RouteAttr {
         Some(methods)
       },
     })
+  }
+}
+
+pub fn build_register_expr(ra: &RouteAttr, fn_name: &Ident) -> TokenStream {
+  let path = ra.path.clone();
+  let methods = if let Some(method) = ra.method.clone() { method } else { vec![Method::GET] };
+  let mut stmts = Vec::new();
+  for ref method in methods {
+    let method_name  = format_ident!("{}", method.as_str().to_uppercase());
+    stmts.push(quote! {router.route(::hyper::Method::#method_name, #path, #fn_name);});
+  };
+  quote! {
+    inventory::submit! {
+      ::miko::auto::RouteFlag {
+        register: |mut router| {
+          #(#stmts)*
+          router
+        }
+      }
+    }
   }
 }
