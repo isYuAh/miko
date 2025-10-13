@@ -10,6 +10,7 @@ use hyper::{body::Incoming, Method, Request};
 use matchit::Router as MRouter;
 use miko_core::{encode_route, IntoMethods};
 use tower::{util::BoxCloneService, Layer, Service};
+#[cfg(feature = "ext")]
 use crate::ext::static_svc::StaticSvcBuilder;
 
 macro_rules! define_method {
