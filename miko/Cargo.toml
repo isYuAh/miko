@@ -4,7 +4,7 @@ version = "0.1.4"
 edition = "2024"
 license = "MIT"
 description = "A web framework for Rust"
-repository = "https://github.com/miko-rs/miko"
+repository = "https://github.com/isyuah/miko"
 
 
 
