@@ -4,7 +4,7 @@ resolver = "3"
 
 [workspace.dependencies]
 miko-core = { path = "miko-core", version = "0.1.3" }
-miko-macros = { path = "miko-macros", version = "0.1.2", features = ["full"] }
+miko-macros = { path = "miko-macros", version = "0.1.3", features = ["full"] }
 
 [workspace.metadata.release]
 # 通用配置，只能放这些字段
