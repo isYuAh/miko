@@ -3,7 +3,7 @@ members = ["miko", "miko-core", "miko-macros"]
 resolver = "3"
 
 [workspace.dependencies]
-miko-core = { path = "miko-core", version = "0.1.3" }
+miko-core = { path = "miko-core", version = "0.1.5" }
 miko-macros = { path = "miko-macros", version = "0.1.3", features = ["full"] }
 
 [workspace.metadata.release]
