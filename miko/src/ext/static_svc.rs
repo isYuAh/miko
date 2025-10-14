@@ -1,19 +1,19 @@
+use crate::handler::router::HttpSvc;
+use http_body_util::BodyExt;
+use hyper::{Method, Response};
+use miko_core::fallible_stream_body::FallibleStreamBody;
+use miko_core::fast_builder::ResponseBuilder;
+use miko_core::{Req, Resp, decode_path};
 use std::convert::Infallible;
 use std::path::{Component, Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use http_body_util::{BodyExt};
-use hyper::{Method, Response};
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
-use tower::{Layer, Service};
 use tower::util::BoxCloneService;
+use tower::{Layer, Service};
 use tower_http::cors::CorsLayer;
-use miko_core::{decode_path, Req, Resp};
-use miko_core::fallible_stream_body::FallibleStreamBody;
-use miko_core::fast_builder::{ResponseBuilder};
-use crate::handler::router::HttpSvc;
 
 #[derive(Clone)]
 pub struct StaticSvc {
@@ -27,7 +27,8 @@ impl StaticSvc {
     fn resolve_path(&self, uri_path: &str) -> PathBuf {
         let mut path = self.root.as_ref().clone();
         let decoded = decode_path(uri_path);
-        let safe_rel = Path::new(&decoded).components()
+        let safe_rel = Path::new(&decoded)
+            .components()
             .filter(|c| matches!(c, Component::Normal(_)))
             .collect::<PathBuf>();
         path.push(safe_rel);
@@ -50,7 +51,9 @@ impl StaticSvc {
             builder = builder.header("Last-Modified", datetime);
         }
         if method == Method::HEAD {
-            return Ok(builder.body(miko_core::fast_builder::box_empty_body()).unwrap());
+            return Ok(builder
+                .body(miko_core::fast_builder::box_empty_body())
+                .unwrap());
         }
         let file_len = metadata.len();
         let file = File::open(path).await?;
@@ -63,14 +66,14 @@ impl StaticSvc {
 pub struct StaticSvcBuilder {
     pub root: PathBuf,
     pub spa_fallback: bool,
-    pub cors_layer: Option<CorsLayer>
+    pub cors_layer: Option<CorsLayer>,
 }
 impl StaticSvcBuilder {
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
             root: root.into(),
             spa_fallback: false,
-            cors_layer: None
+            cors_layer: None,
         }
     }
     pub fn with_spa_fallback(mut self, spa_fallback: bool) -> Self {

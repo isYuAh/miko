@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use syn::{Expr, ExprLit, Lit, LitStr, Meta, Token};
 use syn::parse::ParseStream;
+use syn::{Expr, ExprLit, Lit, LitStr, Meta, Token};
 
 pub struct StrAttrMap {
     pub map: HashMap<String, String>,
@@ -20,7 +20,10 @@ impl StrAttrMap {
                 match meta {
                     Meta::NameValue(nvmeta) => {
                         let ident = nvmeta.path.get_ident().unwrap();
-                        if let Expr::Lit(ExprLit {lit: Lit::Str(str), ..}) = nvmeta.value {
+                        if let Expr::Lit(ExprLit {
+                            lit: Lit::Str(str), ..
+                        }) = nvmeta.value
+                        {
                             map.insert(ident.to_string(), str.value());
                         }
                     }
@@ -45,7 +48,9 @@ impl StrAttrMap {
         self.map.get(key)
     }
     pub fn get_or_default(&self, key: &str) -> Option<String> {
-        self.map.get(key).map(|s| s.to_string())
+        self.map
+            .get(key)
+            .map(|s| s.to_string())
             .or(self.default.clone())
     }
 }

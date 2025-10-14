@@ -16,7 +16,9 @@ pub struct NestLayer {
 }
 impl NestLayer {
     pub fn new(prefix: impl Into<String>) -> Self {
-        Self { prefix: Arc::new(prefix.into()) }
+        Self {
+            prefix: Arc::new(prefix.into()),
+        }
     }
 }
 #[derive(Clone)]
@@ -28,7 +30,10 @@ pub struct NestSvc<S> {
 impl<S> Layer<S> for NestLayer {
     type Service = NestSvc<S>;
     fn layer(&self, inner: S) -> Self::Service {
-        NestSvc { inner, prefix: self.prefix.clone() }
+        NestSvc {
+            inner,
+            prefix: self.prefix.clone(),
+        }
     }
 }
 
@@ -71,7 +76,9 @@ fn count_leading_params(prefix: &str) -> (usize, usize) {
     let mut segs_to_drop = 0usize;
     let mut params_in_prefix = 0usize;
     for seg in prefix.trim_matches('/').split('/') {
-        if seg.is_empty() { continue; }
+        if seg.is_empty() {
+            continue;
+        }
         segs_to_drop += 1;
         let b = seg.as_bytes();
         if b.first() == Some(&b'{') && b.last() == Some(&b'}') {
@@ -87,31 +94,42 @@ fn strip_prefix_preserve_query(uri: &Uri, prefix: &str) -> (Uri, usize) {
     let path = uri.path();
     let bytes = path.as_bytes();
     let mut i = 0usize;
-    while i < bytes.len() && bytes[i] == b'/' { i += 1; }
+    while i < bytes.len() && bytes[i] == b'/' {
+        i += 1;
+    }
 
     let mut cut = 0usize;
     if segs_to_drop > 0 {
         let mut dropped = 0usize;
         loop {
-            while i < bytes.len() && bytes[i] != b'/' { i += 1; }
+            while i < bytes.len() && bytes[i] != b'/' {
+                i += 1;
+            }
             let next_slash = i.min(bytes.len());
-            while i < bytes.len() && bytes[i] == b'/' { i += 1; }
+            while i < bytes.len() && bytes[i] == b'/' {
+                i += 1;
+            }
             dropped += 1;
             cut = next_slash;
-            if dropped >= segs_to_drop || i >= bytes.len() { break; }
+            if dropped >= segs_to_drop || i >= bytes.len() {
+                break;
+            }
         }
     }
 
-    let new_path = if cut >= path.len() { "/".to_string() } else { path[cut..].to_string() };
+    let new_path = if cut >= path.len() {
+        "/".to_string()
+    } else {
+        path[cut..].to_string()
+    };
     let new_paq = match uri.query() {
         Some(q) if !q.is_empty() => format!("{new_path}?{q}"),
         _ => new_path,
     };
 
     let mut parts = uri.clone().into_parts();
-    parts.path_and_query = Some(
-        PathAndQuery::from_str(&new_paq).unwrap_or_else(|_| PathAndQuery::from_static("/"))
-    );
+    parts.path_and_query =
+        Some(PathAndQuery::from_str(&new_paq).unwrap_or_else(|_| PathAndQuery::from_static("/")));
     let new_uri = Uri::from_parts(parts).unwrap_or_else(|_| Uri::from_static("/"));
     (new_uri, params_in_prefix)
 }

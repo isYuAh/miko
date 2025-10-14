@@ -11,7 +11,7 @@ pub struct RouteFnArg {
     pub attrs: Vec<syn::Attribute>,
     pub is_option: bool,
     pub mark: HashMap<String, ArgAttr>,
-    pub origin: FnArg
+    pub origin: FnArg,
 }
 impl Debug for RouteFnArg {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -28,7 +28,9 @@ pub struct ArgAttr {
 }
 
 impl RouteFnArg {
-    pub fn from_punctuated(inputs: &mut syn::punctuated::Punctuated<FnArg, syn::token::Comma>) -> Vec<RouteFnArg> {
+    pub fn from_punctuated(
+        inputs: &mut syn::punctuated::Punctuated<FnArg, syn::token::Comma>,
+    ) -> Vec<RouteFnArg> {
         let mut out = Vec::new();
         for input in inputs {
             let input_clone = input.clone();
@@ -47,8 +49,8 @@ impl RouteFnArg {
                             } else {
                                 None
                             }
-                        },
-                        _ => None
+                        }
+                        _ => None,
                     };
                     let (is_option, _option_ty) = is_option(&pat.ty);
                     if ident.is_none() {
@@ -87,8 +89,8 @@ impl IntoFnArgs for Vec<RouteFnArg> {
             let mut clone = rfa.origin.clone();
             match callback(rfa) {
                 FnArgResult::Remove => {}
-                FnArgResult::Keep => {out.push(rfa.origin.clone())}
-                FnArgResult::Replace(new) => {out.push(new)}
+                FnArgResult::Keep => out.push(rfa.origin.clone()),
+                FnArgResult::Replace(new) => out.push(new),
                 FnArgResult::RemoveAttr => {
                     if let FnArg::Typed(ref mut pat) = clone {
                         pat.attrs.clear();
@@ -102,20 +104,22 @@ impl IntoFnArgs for Vec<RouteFnArg> {
 }
 
 pub fn is_option(ty: &Type) -> (bool, Option<Type>) {
-    let Type::Path(TypePath {path, ..}) = ty else {return (false, None); };
+    let Type::Path(TypePath { path, .. }) = ty else {
+        return (false, None);
+    };
     let last = path.segments.last().unwrap();
     if last.ident == "Option" {
-      match &last.arguments {
-          syn::PathArguments::AngleBracketed(args) => {
-              let ty = args.args.first().unwrap();
-              let ty = match ty {
-                  syn::GenericArgument::Type(ty) => ty,
-                  _ => panic!("Option must have a type")
-              };
-              (true, Some(ty.clone()))
-          }
-          _ => {(false, None)}
-      }
+        match &last.arguments {
+            syn::PathArguments::AngleBracketed(args) => {
+                let ty = args.args.first().unwrap();
+                let ty = match ty {
+                    syn::GenericArgument::Type(ty) => ty,
+                    _ => panic!("Option must have a type"),
+                };
+                (true, Some(ty.clone()))
+            }
+            _ => (false, None),
+        }
     } else {
         (false, None)
     }
@@ -142,10 +146,9 @@ pub fn parse_attr(attr: &syn::Attribute) -> ArgAttr {
         Ok(())
     } else {
         panic!("not a list attr")
-    }.expect("P IE");
-    ArgAttr {
-        map
     }
+    .expect("P IE");
+    ArgAttr { map }
 }
 
 pub enum FnArgResult {

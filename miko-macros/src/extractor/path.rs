@@ -1,5 +1,5 @@
-use syn::{parse_quote};
 use crate::toolkit::rout_arg::{FnArgResult, RouteFnArg};
+use syn::parse_quote;
 
 pub fn deal_with_path_attr(rfa: &RouteFnArg) -> FnArgResult {
     if rfa.mark.contains_key("path") {

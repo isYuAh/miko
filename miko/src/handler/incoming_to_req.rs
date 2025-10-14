@@ -1,11 +1,15 @@
-use hyper::body::Incoming;
-use hyper::Request;
-use std::{future::Future, pin::Pin, task::{Context, Poll}};
-use std::convert::Infallible;
-use http_body_util::BodyExt;
-use tower::Service;
-use miko_core::{Req, Resp};
 use crate::handler::router::HttpSvc;
+use http_body_util::BodyExt;
+use hyper::Request;
+use hyper::body::Incoming;
+use miko_core::{Req, Resp};
+use std::convert::Infallible;
+use std::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
+use tower::Service;
 
 #[derive(Clone)]
 pub struct IncomingToInternal {
@@ -24,8 +28,7 @@ impl Service<Request<Incoming>> for IncomingToInternal {
     fn call(&mut self, req_incoming: Request<Incoming>) -> Self::Future {
         let mut inner = self.inner.clone();
         Box::pin(async move {
-            let req: Req = req_incoming
-                .map(|inc| inc.map_err(|_| unreachable!()).boxed());
+            let req: Req = req_incoming.map(|inc| inc.map_err(|_| unreachable!()).boxed());
             inner.call(req).await
         })
     }

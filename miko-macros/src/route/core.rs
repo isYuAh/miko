@@ -1,32 +1,41 @@
+use crate::extractor::body::deal_with_body_attr;
+use crate::extractor::path::deal_with_path_attr;
+use crate::route::{RouteAttr, build_register_expr};
+use crate::toolkit::exactors::build_struct_from_query;
+use crate::toolkit::rout_arg::{FnArgResult, IntoFnArgs, RouteFnArg};
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::quote;
-use syn::{parse_quote, ItemFn, Stmt};
-use crate::extractor::body::deal_with_body_attr;
-use crate::extractor::path::deal_with_path_attr;
-use crate::route::{build_register_expr, RouteAttr};
-use crate::toolkit::exactors::build_struct_from_query;
-use crate::toolkit::rout_arg::{FnArgResult, IntoFnArgs, RouteFnArg};
+use syn::{ItemFn, Stmt, parse_quote};
 
 pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
     let fn_name = fn_item.sig.ident.clone();
     // 自动返回值
     let sig = &mut fn_item.sig;
-    if matches!(sig.output,syn::ReturnType::Default) {
+    if matches!(sig.output, syn::ReturnType::Default) {
         (*sig).output = parse_quote!(-> impl ::miko::handler::into_response::IntoResponse)
     }
     let mut inject_segs: Vec<Stmt> = Vec::new();
     let rfa = RouteFnArg::from_punctuated(&mut sig.inputs);
     let path_inputs = rfa.gen_fn_args(deal_with_path_attr);
     let body_inputs = rfa.gen_fn_args(deal_with_body_attr);
-    let plain_inputs = rfa.gen_fn_args(|rfa| if rfa.mark.is_empty() { FnArgResult::Keep } else { FnArgResult::Remove });
+    let plain_inputs = rfa.gen_fn_args(|rfa| {
+        if rfa.mark.is_empty() {
+            FnArgResult::Keep
+        } else {
+            FnArgResult::Remove
+        }
+    });
     // 清空参数
     sig.inputs.clear();
     // 获取无修饰参数
     // 组装path
     sig.inputs.extend(path_inputs);
     // 构建 Query 结构体和解构提取器
-    let q_struct_ident = Ident::new(&format!("__{}_QueryStruct", fn_name.to_string()), Span::call_site());
+    let q_struct_ident = Ident::new(
+        &format!("__{}_QueryStruct", fn_name.to_string()),
+        Span::call_site(),
+    );
     // 重组Query
     let (q_struct, q_struct_exactor) = build_struct_from_query(&rfa, q_struct_ident);
     if q_struct.is_some() {
@@ -40,16 +49,19 @@ pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
     let block = &fn_item.block.clone();
     let inventory_collect: Option<proc_macro2::TokenStream> = if cfg!(feature = "auto") {
         Some(build_register_expr(&args, &fn_name.clone()))
-    } else {None};
+    } else {
+        None
+    };
     quote! {
-    #q_struct
+      #q_struct
 
-    #sig {
-      #(#inject_segs)*
-      #block
+      #sig {
+        #(#inject_segs)*
+        #block
+      }
+
+      #inventory_collect
+
     }
-
-    #inventory_collect
-
-  }.into()
+    .into()
 }

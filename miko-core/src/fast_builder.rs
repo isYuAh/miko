@@ -1,20 +1,23 @@
-use std::convert::Infallible;
-use anyhow::{Error};
+use anyhow::Error;
 use bytes::Bytes;
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Full};
 use hyper::Response;
+use std::convert::Infallible;
 
-pub struct ResponseBuilder{}
+pub struct ResponseBuilder {}
 impl ResponseBuilder {
     pub fn not_found() -> Result<Response<BoxBody<Bytes, Infallible>>, Infallible> {
         Response::builder()
             .status(404)
             .header("Content-Type", "text/plain;charset=utf-8")
-            .body(box_str_resp("Not Found".to_string())).map_err(|_| unreachable!())
+            .body(box_str_resp("Not Found".to_string()))
+            .map_err(|_| unreachable!())
     }
-    
-    pub fn internal_server_error(err: Option<String>) -> Result<Response<BoxBody<Bytes, Infallible>>, Infallible> {
+
+    pub fn internal_server_error(
+        err: Option<String>,
+    ) -> Result<Response<BoxBody<Bytes, Infallible>>, Infallible> {
         let msg = match err {
             Some(e) => format!("Internal Server Error: {}", e),
             None => "Internal Server Error".to_string(),
@@ -22,17 +25,21 @@ impl ResponseBuilder {
         Response::builder()
             .status(500)
             .header("Content-Type", "text/plain;charset=utf-8")
-            .body(box_str_resp(msg)).map_err(|_| unreachable!())
+            .body(box_str_resp(msg))
+            .map_err(|_| unreachable!())
     }
-    
+
     pub fn ok(body: String) -> Result<Response<BoxBody<Bytes, Infallible>>, Infallible> {
         Response::builder()
             .status(200)
             .header("Content-Type", "text/plain;charset=utf-8")
-            .body(box_str_resp(body)).map_err(|_| unreachable!())
+            .body(box_str_resp(body))
+            .map_err(|_| unreachable!())
     }
 
-    pub fn bad_request(err: Option<String>) -> Result<Response<BoxBody<Bytes, Infallible>>, Infallible> {
+    pub fn bad_request(
+        err: Option<String>,
+    ) -> Result<Response<BoxBody<Bytes, Infallible>>, Infallible> {
         let msg = match err {
             Some(e) => format!("Bad Request: {}", e),
             None => "Bad Request".to_string(),
@@ -40,11 +47,12 @@ impl ResponseBuilder {
         Response::builder()
             .status(400)
             .header("Content-Type", "text/plain;charset=utf-8")
-            .body(box_str_resp(msg)).map_err(|_| unreachable!())
+            .body(box_str_resp(msg))
+            .map_err(|_| unreachable!())
     }
 }
 
-fn box_str_resp (str: String) -> BoxBody<Bytes, Infallible> {
+fn box_str_resp(str: String) -> BoxBody<Bytes, Infallible> {
     Full::new(Bytes::from(str)).boxed()
 }
 pub fn box_empty_body() -> BoxBody<Bytes, Infallible> {
@@ -55,6 +63,8 @@ pub fn map_err_to_500(err: Error) -> Result<Response<BoxBody<Bytes, Infallible>>
     ResponseBuilder::internal_server_error(Some(err.to_string()))
 }
 
-pub fn boxed_err<T>(err: Error) -> std::pin::Pin<Box<dyn Future<Output = Result<T, Error>> + Send + 'static>> {
-    Box::pin(async move {Err(err)})
+pub fn boxed_err<T>(
+    err: Error,
+) -> std::pin::Pin<Box<dyn Future<Output = Result<T, Error>> + Send + 'static>> {
+    Box::pin(async move { Err(err) })
 }

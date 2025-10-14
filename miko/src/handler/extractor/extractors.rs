@@ -1,18 +1,21 @@
 use crate::handler::extractor::from_request::FRPFut;
 use crate::handler::extractor::path_params::PathParams;
-use crate::handler::{extractor::from_request::{FRFut, FromRequest, FromRequestParts}, handler::Req};
+use crate::handler::{
+    extractor::from_request::{FRFut, FromRequest, FromRequestParts},
+    handler::Req,
+};
 use anyhow::anyhow;
 use bytes::Bytes;
 use http_body_util::BodyExt;
+use hyper::http::Extensions;
 use hyper::http::request::Parts;
+use hyper::{HeaderMap, Method, Uri};
 use miko_core::fast_builder::boxed_err;
 use mime_guess::Mime;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
-use hyper::http::Extensions;
-use hyper::{Method, Uri};
 
 #[derive(Debug)]
 pub struct Json<T>(pub T);
@@ -20,8 +23,9 @@ pub struct Query<T>(pub T);
 pub struct Path<T>(pub T);
 pub struct State<T>(pub Arc<T>);
 pub struct Form<T>(pub T);
+pub struct Multipart(pub multer::Multipart<'static>);
 #[derive(Debug)]
-pub struct Multipart {
+pub struct MultipartResult {
     pub fields: HashMap<String, Vec<String>>,
     pub files: HashMap<String, Vec<FileItem>>,
 }
@@ -34,7 +38,9 @@ pub struct FileItem {
 }
 
 impl<S, T> FromRequest<S> for Json<T>
-where T: DeserializeOwned + Send + Sync + 'static {
+where
+    T: DeserializeOwned + Send + Sync + 'static,
+{
     fn from_request(mut req: Req, _state: Arc<S>) -> FRFut<Self> {
         let _ = _state;
         Box::pin(async move {
@@ -42,45 +48,45 @@ where T: DeserializeOwned + Send + Sync + 'static {
             let json = serde_json::from_slice(&body);
             match json {
                 Ok(json) => Ok(Json(json)),
-                Err(err) => Err(err.into())
+                Err(err) => Err(err.into()),
             }
         })
     }
 }
 
-
 impl<S, T> FromRequestParts<S> for Query<T>
-where T: DeserializeOwned + Send + Sync + 'static {
+where
+    T: DeserializeOwned + Send + Sync + 'static,
+{
     fn from_request_parts(req: &mut Parts, _state: Arc<S>) -> FRFut<Self> {
         let query = req.uri.query().unwrap_or("");
         let query = serde_urlencoded::from_str(query);
         Box::pin(async move {
             match query {
                 Ok(query) => Ok(Query(query)),
-                Err(err) => Err(err.into())
+                Err(err) => Err(err.into()),
             }
         })
     }
 }
 
 impl<S, T> FromRequestParts<S> for Path<T>
-where T: From<String> + Send + Sync + 'static
+where
+    T: From<String> + Send + Sync + 'static,
 {
     fn from_request_parts(req: &mut Parts, _state: Arc<S>) -> FRFut<Self> {
         let pp = req.extensions.get_mut::<PathParams>().unwrap();
-        if pp.0.len() < 1 {return boxed_err(anyhow!("path params not long enough"))}
+        if pp.0.len() < 1 {
+            return boxed_err(anyhow!("path params not long enough"));
+        }
         let path = pp.0.remove(0).1.clone();
-        Box::pin(async move {
-            Ok(Path(path.into()))
-        })
+        Box::pin(async move { Ok(Path(path.into())) })
     }
 }
 
 impl<S: Send + Sync + 'static> FromRequestParts<S> for State<S> {
     fn from_request_parts(_req: &mut Parts, state: Arc<S>) -> FRPFut<Self> {
-        Box::pin(async move {
-            Ok(State(state.clone()))
-        })
+        Box::pin(async move { Ok(State(state.clone())) })
     }
 }
 
@@ -106,7 +112,8 @@ impl<S> FromRequest<S> for Bytes {
 }
 
 impl<S, T> FromRequest<S> for Form<T>
-where T: DeserializeOwned + Send + Sync + 'static
+where
+    T: DeserializeOwned + Send + Sync + 'static,
 {
     fn from_request(mut req: Req, _state: Arc<S>) -> FRFut<Self> {
         Box::pin(async move {
@@ -117,18 +124,14 @@ where T: DeserializeOwned + Send + Sync + 'static
     }
 }
 
-impl<S> FromRequest<S> for Multipart
-{
+impl<S> FromRequest<S> for MultipartResult {
     fn from_request(mut req: Req, _state: Arc<S>) -> FRFut<Self> {
         Box::pin(async move {
             let mut form = HashMap::new();
             let mut files = HashMap::new();
-            let boundary = req.headers().get("Content-Type")
-                .and_then(|ct| ct.to_str().ok())
-                .and_then(|ct| ct.split("boundary=").nth(1))
-                .ok_or_else(|| anyhow::anyhow!("No boundary found"));
+            let boundary = parse_boundary(req.headers());
             if let Err(err) = boundary {
-                return Err(err.into())
+                return Err(err.into());
             }
             let boundary = boundary.unwrap().to_string();
             let body = req.into_body().into_data_stream();
@@ -151,7 +154,25 @@ impl<S> FromRequest<S> for Multipart
                     form.entry(name).or_insert(vec![]).push(value);
                 }
             }
-            Ok(Multipart { fields: form, files })
+            Ok(MultipartResult {
+                fields: form,
+                files,
+            })
+        })
+    }
+}
+
+impl<S> FromRequest<S> for Multipart {
+    fn from_request(mut req: Req, _state: Arc<S>) -> FRFut<Self> {
+        Box::pin(async move {
+            let boundary = parse_boundary(req.headers());
+            if let Err(err) = boundary {
+                return Err(err.into());
+            }
+            let boundary = boundary.unwrap().to_string();
+            let body = req.into_body().into_data_stream();
+            let multipart = multer::Multipart::new(body, boundary);
+            Ok(Multipart(multipart))
         })
     }
 }
@@ -161,9 +182,7 @@ impl<S> FromRequestParts<S> for Method {
     where
         Self: Sized,
     {
-        Box::pin(async move {
-            Ok(req.method.clone())
-        })
+        Box::pin(async move { Ok(req.method.clone()) })
     }
 }
 
@@ -172,9 +191,7 @@ impl<S> FromRequestParts<S> for Extensions {
     where
         Self: Sized,
     {
-        Box::pin(async move {
-            Ok(req.extensions.clone())
-        })
+        Box::pin(async move { Ok(req.extensions.clone()) })
     }
 }
 
@@ -183,8 +200,15 @@ impl<S> FromRequestParts<S> for Uri {
     where
         Self: Sized,
     {
-        Box::pin(async move {
-            Ok(req.uri.clone())
-        })
+        Box::pin(async move { Ok(req.uri.clone()) })
     }
+}
+
+fn parse_boundary(headers: &HeaderMap) -> Result<String, anyhow::Error> {
+    headers
+        .get("Content-Type")
+        .and_then(|ct| ct.to_str().ok())
+        .and_then(|ct| ct.split("boundary=").nth(1))
+        .map(|s| s.to_string())
+        .ok_or_else(|| anyhow::anyhow!("No boundary found"))
 }

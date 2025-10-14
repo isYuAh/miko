@@ -1,5 +1,5 @@
-use syn::{parse_quote, Type};
 use crate::toolkit::rout_arg::{FnArgResult, RouteFnArg};
+use syn::{Type, parse_quote};
 
 pub fn deal_with_body_attr(rfa: &RouteFnArg) -> FnArgResult {
     if rfa.mark.contains_key("body") {

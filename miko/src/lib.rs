@@ -1,8 +1,8 @@
 pub mod application;
 pub mod config;
-pub mod handler;
 #[cfg(feature = "ext")]
 pub mod ext;
+pub mod handler;
 
 #[cfg(feature = "macro")]
 pub use miko_macros::*;

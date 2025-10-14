@@ -1,6 +1,9 @@
 #![allow(non_snake_case)]
 use crate::handler::extractor::from_request::{FRFut, FRPFut};
-use crate::handler::{extractor::from_request::FromRequest, extractor::from_request::FromRequestParts, into_response::IntoResponse};
+use crate::handler::{
+    extractor::from_request::FromRequest, extractor::from_request::FromRequestParts,
+    into_response::IntoResponse,
+};
 use bytes::Bytes;
 use http_body_util::combinators::BoxBody;
 use hyper::http::request::Parts;
@@ -10,26 +13,26 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tower::util::BoxCloneService;
 use tower::Service;
+use tower::util::BoxCloneService;
 pub type RespBody = BoxBody<Bytes, Infallible>;
 pub type Resp = Response<RespBody>;
 pub type Req = Request<RespBody>;
 pub trait Handler: Send + Sync + 'static {
-  fn call(&self, req: Req) -> Pin<Box<dyn Future<Output = Resp> + Send>>;
+    fn call(&self, req: Req) -> Pin<Box<dyn Future<Output = Resp> + Send>>;
 }
 
 impl<F, Fut, Res> Handler for F
 where
-  F: Fn(Req) -> Fut + Send + Sync + 'static,
-  Fut: Future<Output = Res> + Send + 'static,
-  Res: IntoResponse,
-  {
+    F: Fn(Req) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Res> + Send + 'static,
+    Res: IntoResponse,
+{
     fn call(&self, req: Req) -> Pin<Box<dyn Future<Output = Resp> + Send>> {
         let fut = self(req);
         Box::pin(async move { fut.await.into_response() })
     }
-  }
+}
 
 macro_rules! impl_fn_once_tuple {
   ($($name:ident),+) => {
@@ -45,8 +48,8 @@ macro_rules! impl_fn_once_tuple {
   };
 }
 pub trait FnOnceTuple<Args> {
-  type Output;
-  fn call(self, args: Args) -> Self::Output;
+    type Output;
+    fn call(self, args: Args) -> Self::Output;
 }
 
 impl<F, R> FnOnceTuple<()> for F
@@ -97,11 +100,15 @@ impl_fn_once_tuple_all!();
 pub struct TypedHandler<F, A, S, M> {
     pub f: F,
     pub state: Arc<S>,
-    _marker: PhantomData<(A, M)>
+    _marker: PhantomData<(A, M)>,
 }
 impl<F, A, S, M> TypedHandler<F, A, S, M> {
     pub fn new(f: F, state: Arc<S>) -> Self {
-        Self { f, state, _marker: PhantomData }
+        Self {
+            f,
+            state,
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -124,15 +131,13 @@ where
                     let resp = f.call(args).await;
                     resp.into_response()
                 }
-                Err(err) => {
-                    err.into_response()
-                }
+                Err(err) => err.into_response(),
             }
         })
     }
 }
 
-impl<S> FromRequestParts<S> for () 
+impl<S> FromRequestParts<S> for ()
 where
     S: Send + Sync + 'static,
 {
@@ -192,7 +197,8 @@ macro_rules! impl_from_request_tuple {
     };
 }
 
-impl <S, A> FromRequest<S> for (A,) where
+impl<S, A> FromRequest<S> for (A,)
+where
     S: Send + Sync + 'static,
     A: FromRequest<S> + Send + 'static,
 {
@@ -250,7 +256,7 @@ pub type DynHandler = Arc<dyn Handler + Send + Sync>;
 
 #[derive(Clone)]
 pub struct HandlerSvc {
-    inner: DynHandler
+    inner: DynHandler,
 }
 impl HandlerSvc {
     pub fn new(inner: DynHandler) -> Self {
@@ -267,9 +273,7 @@ impl Service<Req> for HandlerSvc {
     }
     fn call(&mut self, req: Req) -> Self::Future {
         let h = self.inner.clone();
-        Box::pin(async move {
-            Ok(h.call(req).await)
-        })
+        Box::pin(async move { Ok(h.call(req).await) })
     }
 }
 pub fn handler_to_svc(h: DynHandler) -> HttpSvc<Req> {

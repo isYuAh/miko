@@ -1,18 +1,21 @@
+use bytes::Bytes;
+use futures::Stream;
+use http_body::{Body, Frame, SizeHint};
 use std::convert::Infallible;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use bytes::Bytes;
-use http_body::{Body, Frame, SizeHint};
-use futures::Stream;
 
 pub struct FallibleStreamBody<S> {
     stream: S,
-    size_hint: SizeHint
+    size_hint: SizeHint,
 }
 
 impl<S> FallibleStreamBody<S> {
     pub fn new(stream: S) -> Self {
-        Self { stream, size_hint: SizeHint::default() }
+        Self {
+            stream,
+            size_hint: SizeHint::default(),
+        }
     }
 
     pub fn with_size_hint(stream: S, len: u64) -> Self {

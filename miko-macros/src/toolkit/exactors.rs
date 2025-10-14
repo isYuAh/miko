@@ -1,9 +1,12 @@
-use proc_macro2::Ident;
-use quote::{quote};
-use syn::{parse_quote, FnArg, ItemStruct};
 use crate::toolkit::rout_arg::RouteFnArg;
+use proc_macro2::Ident;
+use quote::quote;
+use syn::{FnArg, ItemStruct, parse_quote};
 
-pub fn build_struct_from_query(rfa: &Vec<RouteFnArg>, struct_name: Ident) -> (Option<ItemStruct>, Option<FnArg>) {
+pub fn build_struct_from_query(
+    rfa: &Vec<RouteFnArg>,
+    struct_name: Ident,
+) -> (Option<ItemStruct>, Option<FnArg>) {
     let mut fields = Vec::new();
     let mut idents = Vec::new();
     for rfa in rfa {
@@ -15,13 +18,13 @@ pub fn build_struct_from_query(rfa: &Vec<RouteFnArg>, struct_name: Ident) -> (Op
         }
     }
     if fields.len() > 0 {
-        let q_struct: ItemStruct = parse_quote!{
+        let q_struct: ItemStruct = parse_quote! {
             #[derive(::serde::Deserialize)]
             struct #struct_name {
                 #(#fields),*
             }
         };
-        let stmt: FnArg = parse_quote!{
+        let stmt: FnArg = parse_quote! {
             ::miko::handler::extractor::extractors::Query(#struct_name { #(#idents),* }): ::miko::handler::extractor::extractors::Query<#struct_name>
         };
         (Some(q_struct), Some(stmt))

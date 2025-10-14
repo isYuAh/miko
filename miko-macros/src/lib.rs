@@ -1,38 +1,39 @@
-use crate::route::core::route_handler;
 use crate::route::RouteAttr;
+use crate::route::core::route_handler;
 use crate::toolkit::rout_arg::IntoFnArgs;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, ItemFn};
+use syn::{ItemFn, parse_macro_input};
 
-mod toolkit;
-mod route;
 mod extractor;
+mod route;
+mod toolkit;
 
 #[proc_macro_attribute]
 pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
-  let args = parse_macro_input!(attr as RouteAttr);
-  let fn_item = parse_macro_input!(item as ItemFn);
-  route_handler(args, fn_item)
+    let args = parse_macro_input!(attr as RouteAttr);
+    let fn_item = parse_macro_input!(item as ItemFn);
+    route_handler(args, fn_item)
 }
 
 #[proc_macro_attribute]
 pub fn miko(_attr: TokenStream, item: TokenStream) -> TokenStream {
-  let input_fn = parse_macro_input!(item as ItemFn);
-  let user_statements = &input_fn.block.stmts;
-  quote! {
-    #[::tokio::main]
-    async fn main() {
-      let mut _config = ::miko::config::config::ApplicationConfig::load_().unwrap_or_default();
-      let mut router = ::miko::handler::router::Router::new();
+    let input_fn = parse_macro_input!(item as ItemFn);
+    let user_statements = &input_fn.block.stmts;
+    quote! {
+      #[::tokio::main]
+      async fn main() {
+        let mut _config = ::miko::config::config::ApplicationConfig::load_().unwrap_or_default();
+        let mut router = ::miko::handler::router::Router::new();
 
-      #( #user_statements )*
+        #( #user_statements )*
 
-      router.merge(::miko::auto::collect_global_router());
-      let app = ::miko::application::Application::new(_config, router.take());
-      app.run().await.unwrap();
+        router.merge(::miko::auto::collect_global_router());
+        let app = ::miko::application::Application::new(_config, router.take());
+        app.run().await.unwrap();
+      }
     }
-  }.into()
+    .into()
 }
 macro_rules! derive_route_macro {
     ($macro_name: ident, $method_ident:ident) => {
