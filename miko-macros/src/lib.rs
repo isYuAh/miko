@@ -24,7 +24,7 @@ pub fn miko(_attr: TokenStream, item: TokenStream) -> TokenStream {
     #[::tokio::main]
     async fn main() {
       let mut _config = ::miko::config::config::ApplicationConfig::load_().unwrap_or_default();
-      let mut router = Router::new();
+      let mut router = ::miko::handler::router::Router::new();
 
       #( #user_statements )*
 
