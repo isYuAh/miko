@@ -23,12 +23,13 @@ pub fn miko(_attr: TokenStream, item: TokenStream) -> TokenStream {
   quote! {
     #[::tokio::main]
     async fn main() {
+      let mut _config = ::miko::config::config::ApplicationConfig::load_().unwrap_or_default();
       let mut router = Router::new();
 
       #( #user_statements )*
 
       router.merge(::miko::auto::collect_global_router());
-      let app = ::miko::application::Application::new_(router.take());
+      let app = ::miko::application::Application::new(_config, router.take());
       app.run().await.unwrap();
     }
   }.into()

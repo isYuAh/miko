@@ -16,7 +16,13 @@ impl Parse for RouteAttr {
   fn parse(input: ParseStream) -> syn::Result<Self> {
     let attr_map = StrAttrMap::from_parse_stream(input);
     let path = attr_map.get_or_default("path").unwrap();
-    let methods = attr_map.get("method").unwrap().into_methods();
+    let methods = attr_map.get("method");
+    let methods = match methods {
+      Some(methods) => {
+        methods.into_methods()
+      }
+      None => {vec![]}
+    };
     Ok(RouteAttr {
       path,
       method: if methods.is_empty() {

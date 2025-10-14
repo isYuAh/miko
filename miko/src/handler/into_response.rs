@@ -1,9 +1,10 @@
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http_body_util::{BodyExt, Full, StreamBody};
-use hyper::{body::Frame, Response};
+use hyper::{body::Frame, Response, StatusCode};
 use serde::Serialize;
 use miko_core::fast_builder::ResponseBuilder;
+use crate::handler::extractor::extractors::Json;
 use crate::handler::handler::{Resp, RespBody};
 pub trait IntoResponse {
   fn into_response(self) -> Resp;
@@ -24,8 +25,6 @@ impl IntoResponse for &'static str {
       ResponseBuilder::ok(self.to_string()).unwrap()
   }
 }
-
-pub struct Json<T>(pub T);
 
 impl<T: Serialize> IntoResponse for Json<T> {
   fn into_response(self) -> Resp {
@@ -94,5 +93,18 @@ where
 impl IntoResponse for () {
   fn into_response(self) -> Resp {
     ResponseBuilder::ok("".to_string()).unwrap()
+  }
+}
+
+impl<T> IntoResponse for (StatusCode, T)
+where
+    T: IntoResponse
+{
+  fn into_response(self) -> Resp {
+    let body = self.1.into_response();
+    Response::builder()
+      .status(self.0)
+      .body(body.into_body())
+      .unwrap()
   }
 }

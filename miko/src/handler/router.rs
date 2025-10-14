@@ -215,7 +215,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         }
     }
 
-  pub fn with_layer<L>(mut self, layer: L) -> Self
+  pub fn with_layer<L>(&mut self, layer: L) -> &mut Self
   where
     L: Layer<HttpSvc<Req>> + Send + Sync + 'static,
     L::Service: Service<Req, Response = Resp, Error = Infallible> + Clone + Send + 'static,
@@ -259,5 +259,10 @@ impl<S: Send + Sync + 'static> Router<S> {
             builder
         };
         self.nest_service(prefix, builder.build())
+    }
+
+    pub fn cors_any(&mut self) {
+        use tower_http::cors::CorsLayer;
+        self.with_layer(CorsLayer::permissive());
     }
 }
