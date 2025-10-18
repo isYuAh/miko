@@ -2,7 +2,7 @@ use crate::extractor::body::deal_with_body_attr;
 use crate::extractor::path::deal_with_path_attr;
 use crate::route::{RouteAttr, build_register_expr};
 use crate::toolkit::exactors::build_struct_from_query;
-use crate::toolkit::rout_arg::{FnArgResult, IntoFnArgs, RouteFnArg, build_dep_injector, is_arc};
+use crate::toolkit::rout_arg::{FnArgResult, IntoFnArgs, RouteFnArg, build_dep_injector, is_arc, build_config_value_injector};
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::quote;
@@ -43,6 +43,9 @@ pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
         );
         dep_stmts
     };
+    // 处理config_value
+    let mut config_value_stmts = Vec::new();
+    build_config_value_injector(&rfa, &mut config_value_stmts);
     // 清空参数
     sig.inputs.clear();
     // 获取无修饰参数
@@ -75,6 +78,7 @@ pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
       #sig {
         #(#inject_segs)*
         #(#dep_stmts)*
+        #(#config_value_stmts)*
         #(#user_stmts)*
       }
 

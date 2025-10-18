@@ -2,7 +2,9 @@ use quote::{ToTokens, quote};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
-use syn::{Error, FnArg, LitStr, Meta, Type, TypePath};
+use proc_macro2::TokenStream;
+use syn::{parse_macro_input, FnArg, Meta, Type, TypePath};
+use crate::toolkit::attr::StrAttrMap;
 
 #[derive(Clone)]
 pub struct RouteFnArg {
@@ -10,7 +12,7 @@ pub struct RouteFnArg {
     pub ty: Type,
     pub attrs: Vec<syn::Attribute>,
     pub is_option: bool,
-    pub mark: HashMap<String, ArgAttr>,
+    pub mark: HashMap<String, StrAttrMap>,
     pub origin: FnArg,
 }
 impl Debug for RouteFnArg {
@@ -21,10 +23,6 @@ impl Debug for RouteFnArg {
             .field("mark", &self.mark)
             .finish()
     }
-}
-#[derive(Debug, Clone)]
-pub struct ArgAttr {
-    pub map: HashMap<String, String>,
 }
 
 impl RouteFnArg {
@@ -57,8 +55,13 @@ impl RouteFnArg {
                         panic!("RouteFnArg must have an ident");
                     }
                     for attr in &pat.attrs {
+                        let mut sam = StrAttrMap::new();
+                        if let Meta::List(list) = &attr.meta {
+                            let tk = list.tokens.clone();
+                            sam = syn::parse2(tk).unwrap();
+                        }
                         let ident_str = attr.path().get_ident().unwrap().to_string();
-                        mark.insert(ident_str, parse_attr(attr));
+                        mark.insert(ident_str, sam);
                     }
                     let rfa = RouteFnArg {
                         ident: ident.unwrap(),
@@ -146,32 +149,6 @@ pub fn is_arc(ty: &Type) -> (bool, Option<Type>) {
     }
 }
 
-pub fn parse_attr(attr: &syn::Attribute) -> ArgAttr {
-    let mut map = HashMap::new();
-    let meta = &attr.meta;
-    if let Meta::List(list) = meta {
-        list.parse_nested_meta(|nmeta| {
-            let key = nmeta.path.get_ident().unwrap().to_string();
-            let val: Result<LitStr, Error> = nmeta.value().and_then(|v| v.parse());
-            match val {
-                Ok(val) => {
-                    map.insert(key, val.value());
-                }
-                Err(_) => {
-                    map.insert(key.clone(), key);
-                }
-            }
-            Ok(())
-        })
-    } else if let Meta::Path(_path) = meta {
-        Ok(())
-    } else {
-        panic!("not a list attr")
-    }
-    .expect("P IE");
-    ArgAttr { map }
-}
-
 pub enum FnArgResult {
     Remove,
     Keep,
@@ -193,6 +170,73 @@ pub fn build_dep_injector(rfa: &Vec<RouteFnArg>, dep_stmts: &mut Vec<proc_macro2
                 let #dep_ident = __dep_container.get::<#inner>().await;
             };
             dep_stmts.push(stmt);
+        }
+    }
+}
+
+pub fn build_config_value_injector(rfa: &Vec<RouteFnArg>, config_value_stmts: &mut Vec<TokenStream>) {
+    for rfa in rfa {
+        let mark_item = rfa.mark.get("config");
+        if let Some(item) = mark_item {
+            if let Some(path) = item.get_or_default("path") {
+                let (is_option, inner) = is_option(&rfa.ty);
+                let parse_expr;
+                if is_option {
+                    parse_expr = prase_expr_by_type(&inner.unwrap(), path, rfa.ident.clone(), false);
+                } else {
+                    parse_expr = prase_expr_by_type(&rfa.ty, path, rfa.ident.clone(), true);
+                }
+                config_value_stmts.push(parse_expr);
+            }else {
+                panic!("config param must be like #[config(\"xx\")] or #[config(path=\"xx\")]");
+            }
+        }
+    }
+}
+
+fn prase_expr_by_type(ty: &Type, path: String, ident: syn::Ident, unwrap: bool) -> TokenStream {
+    let expr = match ty {
+        Type::Path(TypePath { path, .. }) => {
+            let last = path.segments.last().unwrap();
+            if last.ident == "String" {
+                quote! {
+                    v.as_str().map(|s| s.to_string())
+                }
+            } else if last.ident == "u32" {
+                quote! {
+                    v.as_integer().and_then(|i| i.try_into().ok())
+                }
+            } else if last.ident == "i32" {
+                quote! {
+                    v.as_integer().and_then(|i| i.try_into().ok())
+                }
+            } else if last.ident == "bool" {
+                quote! {
+                    v.as_bool()
+                }
+            } else if last.ident == "f64" {
+                quote! {
+                    v.as_float()
+                }
+            } else {
+                panic!("unsupported config value type: {}", last.ident);
+            }
+        }
+        _ => {
+            panic!("unsupported config value type");
+        }
+    };
+    if unwrap {
+        quote! {
+            let #ident = ::miko::config::config::get_config_value(#path).and_then(|v| {
+                #expr
+            }).unwrap();
+        }
+    }else {
+        quote! {
+            let #ident = ::miko::config::config::get_config_value(#path).and_then(|v| {
+                #expr
+            });
         }
     }
 }

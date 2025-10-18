@@ -2,9 +2,18 @@ use std::collections::HashMap;
 use syn::parse::{Parse, ParseStream};
 use syn::{Expr, ExprLit, Lit, LitStr, Meta, Token};
 
+#[derive(Debug, Clone)]
 pub struct StrAttrMap {
     pub map: HashMap<String, String>,
     pub default: Option<String>,
+}
+impl StrAttrMap {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::new(),
+            default: None,
+        }
+    }
 }
 
 impl Parse for StrAttrMap {

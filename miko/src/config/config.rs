@@ -99,3 +99,15 @@ pub fn load_config_section<T: DeserializeOwned>(section: &str) -> Result<T, Erro
         .try_into()
         .map_err(|e| anyhow!("Failed to deserialize section '[{}]': {:?}", section, e).into())
 }
+
+
+pub fn get_toml_value_by_path<'a>(value: &'a Value, path: &str) -> Option<&'a Value> {
+    let mut current = Some(value);
+    for key in path.split('.') {
+        current = current.and_then(|v| v.get(key));
+    }
+    current
+}
+pub fn get_config_value(path: &str) -> Option<&Value> {
+    get_toml_value_by_path(get_config(), path)
+}
