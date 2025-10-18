@@ -125,6 +125,28 @@ pub fn is_option(ty: &Type) -> (bool, Option<Type>) {
     }
 }
 
+pub fn is_arc(ty: &Type) -> (bool, Option<Type>) {
+    let Type::Path(TypePath { path, .. }) = ty else {
+        return (false, None);
+    };
+    let last = path.segments.last().unwrap();
+    if last.ident == "Arc" {
+        match &last.arguments {
+            syn::PathArguments::AngleBracketed(args) => {
+                let ty = args.args.first().unwrap();
+                let ty = match ty {
+                    syn::GenericArgument::Type(ty) => ty,
+                    _ => panic!("Arc must have a type"),
+                };
+                (true, Some(ty.clone()))
+            }
+            _ => (false, None),
+        }
+    } else {
+        (false, None)
+    }
+}
+
 pub fn parse_attr(attr: &syn::Attribute) -> ArgAttr {
     let mut map = HashMap::new();
     let meta = &attr.meta;

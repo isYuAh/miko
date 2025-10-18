@@ -7,7 +7,7 @@ use tower::util::BoxCloneService;
 pub struct Uploader {}
 
 impl Uploader {
-    /// 创建单文件上传处理（仅处理遇到的第一个文件）
+    /// 创建单文件上传处理（仅处理遇到的第一个文件，不限字段名）
     pub fn single<T>(storage_provider: T) -> HttpSvc<Req>
     where
         T: UploaderProcesser + Clone + Send + Sync + 'static,

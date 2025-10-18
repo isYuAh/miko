@@ -9,3 +9,4 @@ pub use miko_macros::*;
 
 #[cfg(feature = "auto")]
 pub mod auto;
+pub mod dep;

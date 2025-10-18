@@ -1,10 +1,16 @@
 use std::collections::HashMap;
-use syn::parse::ParseStream;
+use syn::parse::{Parse, ParseStream};
 use syn::{Expr, ExprLit, Lit, LitStr, Meta, Token};
 
 pub struct StrAttrMap {
     pub map: HashMap<String, String>,
     pub default: Option<String>,
+}
+
+impl Parse for StrAttrMap {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        Ok(StrAttrMap::from_parse_stream(input))
+    }
 }
 
 impl StrAttrMap {

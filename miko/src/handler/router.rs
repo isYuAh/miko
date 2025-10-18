@@ -133,6 +133,9 @@ impl Router {
 }
 
 impl<S: Send + Sync + 'static> Router<S> {
+    /// 将一个handler挂载到path上
+    ///
+    /// - 派生了get post put delete head options trace connect patch，可以指定方法
     pub fn route<F, A, Fut, R, M>(
         &mut self,
         method: impl IntoMethods,
@@ -182,6 +185,9 @@ impl<S: Send + Sync + 'static> Router<S> {
 }
 
 impl<S: Send + Sync + 'static> Router<S> {
+    /// 挂载state，可以被State()提取器获取
+    ///
+    /// 注意是生成类型不同的新Router，所以需要重新let赋值
     pub fn with_state<T>(self, state: T) -> Router<T> {
         Router {
             routes: self.routes,
@@ -191,6 +197,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         }
     }
 
+    /// 合并两个Router
     pub fn merge<T>(&mut self, other: Router<T>) -> &mut Self {
         for (method, router) in other.routes {
             self.routes
@@ -213,6 +220,11 @@ impl<S: Send + Sync + 'static> Router<S> {
         self
     }
 
+    /// 挂载一个Router到某个特定前缀
+    ///
+    /// 被挂载的Router内部的路由获取的是去除前缀的uri和path_params
+    ///
+    /// 如前缀为/api，访问/api/users，则内部路由感知到的为/users
     pub fn nest<T>(&mut self, prefix: &str, mut other: Router<T>) -> &mut Self {
         let prefix = prefix.trim_end_matches('/').to_string();
 
@@ -235,7 +247,11 @@ impl<S: Send + Sync + 'static> Router<S> {
         self
     }
 
-    /// 挂载service到某个前缀上的所有路由，所有Method
+    /// 挂载service到某个前缀上的所有路由，所有常用Method
+    ///
+    /// 不需要指定{*rest}，会自动附加
+    ///
+    /// 如果需要自己控制，使用`service`函数
     pub fn nest_service(&mut self, prefix: &str, svc: HttpSvc<Req>) {
         let prefix = prefix.trim_end_matches('/').to_string();
         let layered = NestLayer::new(&prefix).layer(svc);
@@ -274,6 +290,7 @@ impl<S: Send + Sync + 'static> Router<S> {
     }
 
     /// 挂载service到所有Method
+    /// 派生了get_service等单独挂载的方法
     pub fn service(&mut self, path: &str, svc: HttpSvc<Req>) {
         let methods = [
             Method::GET,
@@ -319,6 +336,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         svc
     }
 
+    /// 从&mut借用获取所有权，使用mem::replace实现
     pub fn take(&mut self) -> Self {
         std::mem::replace(
             self,
@@ -334,6 +352,7 @@ impl<S: Send + Sync + 'static> Router<S> {
 
 #[cfg(feature = "ext")]
 impl<S: Send + Sync + 'static> Router<S> {
+    /// 静态文件服务
     pub fn static_svc<F>(
         &mut self,
         prefix: &str,
@@ -351,6 +370,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         self.nest_service(prefix, builder.build())
     }
 
+    /// 允许任意跨域
     pub fn cors_any(&mut self) {
         use tower_http::cors::CorsLayer;
         self.with_layer(CorsLayer::permissive());

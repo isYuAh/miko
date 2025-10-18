@@ -1,5 +1,12 @@
+use anyhow::{Error, anyhow};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::OnceLock;
 use toml::Value;
+use toml::map::Map;
+
+static CONFIG: OnceLock<Value> = OnceLock::new();
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ApplicationConfig {
@@ -8,20 +15,7 @@ pub struct ApplicationConfig {
 }
 impl ApplicationConfig {
     pub fn load_() -> Result<Self, Box<dyn std::error::Error>> {
-        let content = std::fs::read_to_string("./config.toml").inspect_err(|e| {
-            tracing::warn!("Failed to read config.toml: {:?}", e);
-        })?;
-        let mut base: Value = toml::from_str(&content).inspect_err(|e| {
-            tracing::warn!("Failed to parse config.toml: {:?}", e);
-        })?;
-        let env = if cfg!(debug_assertions) {
-            "dev"
-        } else {
-            "prod"
-        };
-        if let Ok(env_base) = std::fs::read_to_string(format!("./config.{env}.value")) {
-            merge_toml(&mut base, &toml::from_str(&env_base)?);
-        }
+        let base: Value = load_config_section("application")?;
         Ok(base
             .try_into()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?)
@@ -33,6 +27,14 @@ impl Default for ApplicationConfig {
             addr: "0.0.0.0".to_string(),
             port: 8080,
         }
+    }
+}
+impl ApplicationConfig {
+    pub fn to_hash_map(&self) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        map.insert("addr".to_string(), self.addr.clone());
+        map.insert("port".to_string(), self.port.to_string());
+        map
     }
 }
 
@@ -50,4 +52,50 @@ fn merge_toml(base: &mut Value, other: &Value) {
         }
         (b, o) => *b = o.clone(),
     }
+}
+
+pub fn load_and_merge_toml() -> Result<Value, anyhow::Error> {
+    let content = std::fs::read_to_string("./config.toml").inspect_err(|e| {
+        tracing::warn!("Failed to read config.toml: {:?}", e);
+    })?;
+    let mut base: Value = toml::from_str(&content).inspect_err(|e| {
+        tracing::warn!("Failed to parse config.toml: {:?}", e);
+    })?;
+    let env = if cfg!(debug_assertions) {
+        "dev"
+    } else {
+        "prod"
+    };
+    if let Ok(env_base) = std::fs::read_to_string(format!("./config.{env}.value")) {
+        merge_toml(&mut base, &toml::from_str(&env_base)?);
+    }
+    Ok(base)
+}
+
+pub fn get_config() -> &'static Value {
+    CONFIG.get_or_init(|| {
+        let val = load_and_merge_toml();
+        val.unwrap_or_else(|e| {
+            tracing::error!("Failed to load config: {:?}", e);
+            let default = ApplicationConfig::default();
+            let mut map = Map::new();
+            map.insert(
+                "application".to_string(),
+                Value::from(default.to_hash_map()),
+            );
+            Value::Table(map)
+        })
+    })
+}
+
+pub fn load_config_section<T: DeserializeOwned>(section: &str) -> Result<T, Error> {
+    let config = get_config();
+    let section_value = config
+        .get(section)
+        .ok_or_else(|| anyhow!("Configuration section '[{}]' not found.", section))?;
+
+    section_value
+        .clone()
+        .try_into()
+        .map_err(|e| anyhow!("Failed to deserialize section '[{}]': {:?}", section, e).into())
 }

@@ -9,11 +9,9 @@ use bytes::Bytes;
 use http_body_util::BodyExt;
 use hyper::http::Extensions;
 use hyper::http::request::Parts;
-use hyper::{HeaderMap, Method, Uri};
+use hyper::{Method, Uri};
 use miko_core::fast_builder::boxed_err;
-use mime_guess::Mime;
 use serde::de::DeserializeOwned;
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -23,19 +21,6 @@ pub struct Query<T>(pub T);
 pub struct Path<T>(pub T);
 pub struct State<T>(pub Arc<T>);
 pub struct Form<T>(pub T);
-pub struct Multipart(pub multer::Multipart<'static>);
-#[derive(Debug)]
-pub struct MultipartResult {
-    pub fields: HashMap<String, Vec<String>>,
-    pub files: HashMap<String, Vec<FileItem>>,
-}
-#[derive(Debug)]
-pub struct FileItem {
-    pub filename: String,
-    pub bytes: Bytes,
-    pub size: usize,
-    pub content_type: Option<Mime>,
-}
 
 impl<S, T> FromRequest<S> for Json<T>
 where
@@ -124,59 +109,6 @@ where
     }
 }
 
-impl<S> FromRequest<S> for MultipartResult {
-    fn from_request(mut req: Req, _state: Arc<S>) -> FRFut<Self> {
-        Box::pin(async move {
-            let mut form = HashMap::new();
-            let mut files = HashMap::new();
-            let boundary = parse_boundary(req.headers());
-            if let Err(err) = boundary {
-                return Err(err.into());
-            }
-            let boundary = boundary.unwrap().to_string();
-            let body = req.into_body().into_data_stream();
-            let mut multipart = multer::Multipart::new(body, boundary);
-            while let Some(field) = multipart.next_field().await? {
-                let name = field.name().unwrap().to_string();
-                if let Some(filename) = field.file_name() {
-                    let filename = filename.to_string();
-                    let content_type = field.content_type().map(|ct| ct.clone());
-                    let bytes = field.bytes().await?;
-                    let fil = FileItem {
-                        filename,
-                        size: bytes.len(),
-                        bytes,
-                        content_type,
-                    };
-                    files.entry(name).or_insert(vec![]).push(fil);
-                } else {
-                    let value = field.text().await?;
-                    form.entry(name).or_insert(vec![]).push(value);
-                }
-            }
-            Ok(MultipartResult {
-                fields: form,
-                files,
-            })
-        })
-    }
-}
-
-impl<S> FromRequest<S> for Multipart {
-    fn from_request(mut req: Req, _state: Arc<S>) -> FRFut<Self> {
-        Box::pin(async move {
-            let boundary = parse_boundary(req.headers());
-            if let Err(err) = boundary {
-                return Err(err.into());
-            }
-            let boundary = boundary.unwrap().to_string();
-            let body = req.into_body().into_data_stream();
-            let multipart = multer::Multipart::new(body, boundary);
-            Ok(Multipart(multipart))
-        })
-    }
-}
-
 impl<S> FromRequestParts<S> for Method {
     fn from_request_parts(req: &mut Parts, state: Arc<S>) -> FRPFut<Self>
     where
@@ -202,13 +134,4 @@ impl<S> FromRequestParts<S> for Uri {
     {
         Box::pin(async move { Ok(req.uri.clone()) })
     }
-}
-
-fn parse_boundary(headers: &HeaderMap) -> Result<String, anyhow::Error> {
-    headers
-        .get("Content-Type")
-        .and_then(|ct| ct.to_str().ok())
-        .and_then(|ct| ct.split("boundary=").nth(1))
-        .map(|s| s.to_string())
-        .ok_or_else(|| anyhow::anyhow!("No boundary found"))
 }

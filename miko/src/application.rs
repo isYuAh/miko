@@ -19,6 +19,7 @@ pub struct Application {
     svc: HttpSvc<Req>,
 }
 
+/// 应用程序
 impl Application {
     pub fn new<S: Send + Sync + 'static>(
         config: ApplicationConfig,
@@ -36,6 +37,7 @@ impl Application {
 }
 
 impl Application {
+    /// 运行一个应用程序，基于self.config和self.router开始监听
     pub async fn run(self: Arc<Self>) -> IoResult<()> {
         let addr = format!("{}:{}", self.config.addr, self.config.port);
         let listener = TcpListener::bind(addr).await?;

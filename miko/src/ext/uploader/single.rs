@@ -1,6 +1,6 @@
 use crate::ext::uploader::{FileField, UploadedFile};
-use crate::handler::extractor::extractors::Multipart;
 use crate::handler::extractor::from_request::FromRequest;
+use crate::handler::extractor::multipart::Multipart;
 use crate::handler::handler::Req;
 use crate::handler::into_response::IntoResponse;
 use futures::StreamExt;
@@ -32,7 +32,7 @@ where
     type Response = Resp;
     type Error = Infallible;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
     fn call(&mut self, req: Req) -> Self::Future {
