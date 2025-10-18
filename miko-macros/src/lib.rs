@@ -30,7 +30,7 @@ pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn miko(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
     let user_statements = &input_fn.block.stmts;
-    let dep_init: Option<TokenStream> = None;
+    let dep_init: Option<proc_macro2::TokenStream> = None;
     #[cfg(feature = "auto")]
     let dep_init = quote! {
         ::miko::dep::CONTAINER.get_or_init(|| async {
