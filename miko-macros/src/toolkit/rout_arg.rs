@@ -54,7 +54,6 @@ impl RouteFnArg {
                     };
                     let (is_option, _option_ty) = is_option(&pat.ty);
                     if ident.is_none() {
-                        panic!("{:?}", pat.pat.to_token_stream().to_string());
                         panic!("RouteFnArg must have an ident");
                     }
                     for attr in &pat.attrs {

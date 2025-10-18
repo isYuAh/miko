@@ -2,9 +2,8 @@ use crate::route::RouteAttr;
 use crate::route::core::route_handler;
 use crate::toolkit::attr::StrAttrMap;
 use crate::toolkit::impl_operation::{get_constructor, inject_deps};
-use crate::toolkit::rout_arg::IntoFnArgs;
 use proc_macro::TokenStream;
-use quote::{ToTokens, format_ident, quote};
+use quote::{format_ident, quote};
 use syn::{ItemFn, ItemImpl, TypePath, parse_macro_input};
 
 mod extractor;
