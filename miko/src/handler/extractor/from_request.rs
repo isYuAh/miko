@@ -72,7 +72,7 @@ where
     }
 }
 
-impl<S, T> FromRequest<S> for Result<T, anyhow::Error>
+impl<S, T> FromRequest<S> for Result<T, Error>
 where
     S: Send + Sync + 'static,
     T: FromRequest<S> + Send + 'static,
@@ -81,13 +81,13 @@ where
         Box::pin(async move {
             match T::from_request(req, state).await {
                 Ok(v) => Ok(Ok(v)),
-                Err(_e) => Err(_e),
+                Err(_e) => Ok(Err(_e)),
             }
         })
     }
 }
 
-impl<S, T> FromRequestParts<S> for Result<T, anyhow::Error>
+impl<S, T> FromRequestParts<S> for Result<T, Error>
 where
     S: Send + Sync + 'static,
     T: FromRequestParts<S> + Send + 'static,

@@ -2,7 +2,7 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
-use tokio::sync::{OnceCell, RwLock};
+use tokio::sync::{OnceCell, RwLock, RwLockReadGuard};
 
 #[cfg(feature = "auto")]
 pub static CONTAINER: OnceCell<Arc<RwLock<LazyDependencyContainer>>> = OnceCell::const_new();
@@ -130,4 +130,10 @@ impl ArcAnyExt for dyn Any + Send + Sync {
             None
         }
     }
+}
+
+/// 获取全局的依赖容器
+#[cfg(feature = "auto")]
+pub async fn get_global_dc() -> RwLockReadGuard<'static, LazyDependencyContainer> {
+    CONTAINER.get().unwrap().read().await
 }

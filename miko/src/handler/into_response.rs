@@ -76,7 +76,7 @@ impl IntoResponse for anyhow::Error {
                 "Internal Server Error: {}",
                 self
             ))))
-            .unwrap()
+            .expect("error when create error response")
     }
 }
 

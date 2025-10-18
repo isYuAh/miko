@@ -1,4 +1,4 @@
-use quote::ToTokens;
+use quote::{ToTokens, quote};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
@@ -177,4 +177,22 @@ pub enum FnArgResult {
     Keep,
     Replace(FnArg),
     RemoveAttr,
+}
+
+pub fn build_dep_injector(rfa: &Vec<RouteFnArg>, dep_stmts: &mut Vec<proc_macro2::TokenStream>) {
+    for rfa in rfa {
+        if rfa.mark.contains_key("dep") {
+            let dep_ty = rfa.ty.clone();
+            let (is_arc, inner) = is_arc(&dep_ty);
+            if !is_arc {
+                panic!("dep param must be a Arc<T>");
+            }
+            let inner = inner.unwrap();
+            let dep_ident = rfa.ident.clone();
+            let stmt = quote! {
+                let #dep_ident = __dep_container.get::<#inner>().await;
+            };
+            dep_stmts.push(stmt);
+        }
+    }
 }

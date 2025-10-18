@@ -27,32 +27,41 @@ pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// - 收集定义#\[get]等宏定义的路由并注册
 /// - 运行app
 #[proc_macro_attribute]
-pub fn miko(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn miko(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
+    let str_attr_map = parse_macro_input!(attr as StrAttrMap);
     let user_statements = &input_fn.block.stmts;
+    let set_panic_hook = if str_attr_map.map.contains_key("sse") {
+        Some(quote! {
+            ::miko::handler::response::sse::set_sse_panic_hook();
+        })
+    } else {
+        None
+    };
     let dep_init: Option<proc_macro2::TokenStream> = None;
     #[cfg(feature = "auto")]
     let dep_init = quote! {
         ::miko::dep::CONTAINER.get_or_init(|| async {
-            LazyDependencyContainer::new_()
+            ::miko::dep::LazyDependencyContainer::new_()
         }).await;
     };
     quote! {
-      #[::tokio::main]
-      async fn main() {
-        let mut _config = ::miko::config::config::ApplicationConfig::load_().unwrap_or_default();
-        let mut router = ::miko::handler::router::Router::new();
-        #dep_init
+        #[::tokio::main]
+        async fn main() {
+            #set_panic_hook
+            let mut _config = ::miko::config::config::ApplicationConfig::load_().unwrap_or_default();
+            let mut router = ::miko::handler::router::Router::new();
+            #dep_init
 
-        #( #user_statements )*
+            #( #user_statements )*
 
-        router.merge(::miko::auto::collect_global_router());
-        let app = ::miko::application::Application::new(_config, router.take());
-        ::tokio::spawn(async {
-            ::miko::dep::CONTAINER.get().unwrap().read().await.prewarm_all().await;
-        });
-        app.run().await.unwrap();
-      }
+            router.merge(::miko::auto::collect_global_router());
+            let app = ::miko::application::Application::new(_config, router.take());
+            ::tokio::spawn(async {
+                ::miko::dep::CONTAINER.get().unwrap().read().await.prewarm_all().await;
+            });
+            app.run().await.unwrap();
+        }
     }
     .into()
 }
