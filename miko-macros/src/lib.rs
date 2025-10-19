@@ -38,12 +38,14 @@ pub fn miko(attr: TokenStream, item: TokenStream) -> TokenStream {
     } else {
         None
     };
-    let dep_init: Option<proc_macro2::TokenStream> = None;
-    #[cfg(feature = "auto")]
-    let dep_init = quote! {
-        ::miko::dep::CONTAINER.get_or_init(|| async {
-            ::miko::dep::LazyDependencyContainer::new_()
-        }).await;
+    let dep_init = if cfg!(feature = "auto") {
+        quote! {
+            ::miko::dep::CONTAINER.get_or_init(|| async {
+                ::miko::dep::LazyDependencyContainer::new_()
+            }).await;
+        }
+    } else {
+        quote! {}
     };
     quote! {
         #[::tokio::main]

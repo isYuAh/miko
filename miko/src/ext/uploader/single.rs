@@ -3,7 +3,6 @@ use crate::handler::extractor::from_request::FromRequest;
 use crate::handler::extractor::multipart::Multipart;
 use crate::handler::handler::Req;
 use crate::handler::into_response::IntoResponse;
-use futures::StreamExt;
 use hyper::StatusCode;
 use miko_core::Resp;
 use miko_core::fast_builder::ResponseBuilder;
@@ -40,20 +39,22 @@ where
         Box::pin(async move {
             let Multipart(mut multipart) =
                 Multipart::from_request(req, Arc::new(())).await.unwrap();
-            let mut ffield = None;
-            while let field = multipart.next_field().await {
+            let ffield;
+            loop {
+                let field = multipart.next_field().await;
                 if let Err(e) = field {
                     return ResponseBuilder::internal_server_error(Some(e.to_string()));
                 }
                 if let Some(field) = field.unwrap() {
-                    let sign = field.file_name().is_some();
-                    ffield = Some(FileField {
-                        original_filename: field.file_name().unwrap_or("").to_string(),
-                        content_type: field.content_type().map(|s| s.clone()),
-                        field,
-                    });
-                    if sign {
+                    if field.file_name().is_some() {
+                        ffield = Some(FileField {
+                            original_filename: field.file_name().unwrap_or("").to_string(),
+                            content_type: field.content_type().map(|s| s.clone()),
+                            field,
+                        });
                         break;
+                    } else {
+                        continue;
                     }
                 } else {
                     return ResponseBuilder::internal_server_error(Some("No field".to_string()));
@@ -65,7 +66,7 @@ where
                     ResponseBuilder::ok(format!("uploaded file {}", file.original_filename))
                 }
                 Err(e) => {
-                    Ok((StatusCode::INTERNAL_SERVER_ERROR, e.into_response()).into_response())
+                    Ok((StatusCode::BAD_REQUEST, e.into_response()).into_response())
                 }
             }
         })

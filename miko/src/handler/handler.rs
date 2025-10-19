@@ -204,7 +204,7 @@ where
 {
     fn from_request(req: Req, state: Arc<S>) -> FRFut<Self> {
         Box::pin(async move {
-            let (mut parts, body) = req.into_parts();
+            let (parts, body) = req.into_parts();
             let req = Req::from_parts(parts, body);
             let a = A::from_request(req, state).await?;
             Ok((a,))

@@ -69,7 +69,7 @@ impl FileField {
         Ok(UploadedFile {
             original_filename: self.original_filename,
             final_filename: filename.to_string(),
-            size: size,
+            size,
             content_type: self.content_type,
         })
     }

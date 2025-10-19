@@ -54,7 +54,7 @@ fn merge_toml(base: &mut Value, other: &Value) {
     }
 }
 
-pub fn load_and_merge_toml() -> Result<Value, anyhow::Error> {
+pub fn load_and_merge_toml() -> Result<Value, Error> {
     let content = std::fs::read_to_string("./config.toml").inspect_err(|e| {
         tracing::warn!("Failed to read config.toml: {:?}", e);
     })?;

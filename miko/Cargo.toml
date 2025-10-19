@@ -33,11 +33,14 @@ httpdate = {version =  "1.0.3", optional = true }
 tokio-util = "0.7.16"
 tempfile = "3.23.0"
 tokio-stream = "0.1.17"
+tungstenite = "0.28.0"
+tokio-tungstenite = "0.28.0"
 
 [features]
-full = ["inner_log", "macro", "auto", "ext"]
+full = ["inner_log", "macro", "auto", "ext", "ws"]
 inner_log = []
 macro = ["miko-macros"]
+ws = []
 auto = ["macro", "miko-macros/auto", "inventory"]
 ext = ["tower-http", "httpdate"]
 

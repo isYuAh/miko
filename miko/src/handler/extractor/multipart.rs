@@ -55,7 +55,7 @@ impl MultipartFileDiskLinker {
 }
 
 impl<S> FromRequest<S> for MultipartResult {
-    fn from_request(mut req: Req, _state: Arc<S>) -> FRFut<Self> {
+    fn from_request(req: Req, _state: Arc<S>) -> FRFut<Self> {
         Box::pin(async move {
             let mut form = HashMap::new();
             let mut files = HashMap::new();
@@ -71,7 +71,7 @@ impl<S> FromRequest<S> for MultipartResult {
                 if let Some(filename) = field.file_name() {
                     let filename = filename.to_string();
                     let content_type = field.content_type().map(|ct| ct.clone());
-                    let temp_file = tempfile::NamedTempFile::new()?;
+                    let temp_file = NamedTempFile::new()?;
                     let file_path = temp_file.path().to_path_buf();
                     let mut async_file_writer = File::options()
                         .read(true)
@@ -110,7 +110,7 @@ impl<S> FromRequest<S> for MultipartResult {
 }
 
 impl<S> FromRequest<S> for Multipart {
-    fn from_request(mut req: Req, _state: Arc<S>) -> FRFut<Self> {
+    fn from_request(req: Req, _state: Arc<S>) -> FRFut<Self> {
         Box::pin(async move {
             let boundary = parse_boundary(req.headers());
             if let Err(err) = boundary {

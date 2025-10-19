@@ -2,7 +2,7 @@ use crate::extractor::body::deal_with_body_attr;
 use crate::extractor::path::deal_with_path_attr;
 use crate::route::{RouteAttr, build_register_expr};
 use crate::toolkit::exactors::build_struct_from_query;
-use crate::toolkit::rout_arg::{FnArgResult, IntoFnArgs, RouteFnArg, build_dep_injector, is_arc, build_config_value_injector};
+use crate::toolkit::rout_arg::{FnArgResult, IntoFnArgs, RouteFnArg, build_dep_injector, build_config_value_injector};
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::quote;
@@ -15,7 +15,7 @@ pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
     if matches!(sig.output, syn::ReturnType::Default) {
         (*sig).output = parse_quote!(-> impl ::miko::handler::into_response::IntoResponse)
     }
-    let mut inject_segs: Vec<Stmt> = Vec::new();
+    let inject_segs: Vec<Stmt> = Vec::new();
     let rfa = RouteFnArg::from_punctuated(&mut sig.inputs);
     //处理路由
     let path_inputs = rfa.gen_fn_args(deal_with_path_attr);

@@ -70,7 +70,7 @@ where
 }
 
 impl<S: Send + Sync + 'static> FromRequestParts<S> for State<S> {
-    fn from_request_parts(_req: &mut Parts, state: Arc<S>) -> FRPFut<Self> {
+    fn from_request_parts(_req: &mut Parts, state: Arc<S>) -> FRPFut<'_, Self> {
         Box::pin(async move { Ok(State(state.clone())) })
     }
 }
@@ -110,7 +110,7 @@ where
 }
 
 impl<S> FromRequestParts<S> for Method {
-    fn from_request_parts(req: &mut Parts, state: Arc<S>) -> FRPFut<Self>
+    fn from_request_parts(req: &mut Parts, _: Arc<S>) -> FRPFut<'_, Self>
     where
         Self: Sized,
     {
@@ -119,7 +119,7 @@ impl<S> FromRequestParts<S> for Method {
 }
 
 impl<S> FromRequestParts<S> for Extensions {
-    fn from_request_parts(req: &mut Parts, state: Arc<S>) -> FRPFut<Self>
+    fn from_request_parts(req: &mut Parts, _: Arc<S>) -> FRPFut<'_, Self>
     where
         Self: Sized,
     {
@@ -128,7 +128,7 @@ impl<S> FromRequestParts<S> for Extensions {
 }
 
 impl<S> FromRequestParts<S> for Uri {
-    fn from_request_parts(req: &mut Parts, state: Arc<S>) -> FRPFut<Self>
+    fn from_request_parts(req: &mut Parts, _: Arc<S>) -> FRPFut<'_, Self>
     where
         Self: Sized,
     {

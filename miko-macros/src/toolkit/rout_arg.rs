@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use proc_macro2::TokenStream;
-use syn::{parse_macro_input, FnArg, Meta, Type, TypePath};
+use syn::{FnArg, Meta, Type, TypePath};
 use crate::toolkit::attr::StrAttrMap;
-
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct RouteFnArg {
     pub ident: syn::Ident,
@@ -149,6 +149,7 @@ pub fn is_arc(ty: &Type) -> (bool, Option<Type>) {
     }
 }
 
+#[allow(dead_code)]
 pub enum FnArgResult {
     Remove,
     Keep,
@@ -156,7 +157,7 @@ pub enum FnArgResult {
     RemoveAttr,
 }
 
-pub fn build_dep_injector(rfa: &Vec<RouteFnArg>, dep_stmts: &mut Vec<proc_macro2::TokenStream>) {
+pub fn build_dep_injector(rfa: &Vec<RouteFnArg>, dep_stmts: &mut Vec<TokenStream>) {
     for rfa in rfa {
         if rfa.mark.contains_key("dep") {
             let dep_ty = rfa.ty.clone();

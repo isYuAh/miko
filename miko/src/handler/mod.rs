@@ -6,3 +6,4 @@ pub mod nested_handler;
 pub mod response;
 pub mod router;
 pub mod router_svc;
+pub mod ws;

@@ -53,7 +53,7 @@ impl Application {
                 inner: service.clone(),
             });
             tokio::spawn(async move {
-                if let Err(_e) = builder.serve_connection(io, service).await {
+                if let Err(_e) = builder.serve_connection_with_upgrades(io, service).await {
                     #[cfg(feature = "inner_log")]
                     tracing::warn!("conn error {_e}");
                 };
