@@ -1,10 +1,10 @@
+use crate::toolkit::attr::StrAttrMap;
+use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
-use proc_macro2::TokenStream;
 use syn::{FnArg, Meta, Type, TypePath};
-use crate::toolkit::attr::StrAttrMap;
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct RouteFnArg {
@@ -189,7 +189,10 @@ pub fn build_dep_injector(rfa: &Vec<RouteFnArg>, dep_stmts: &mut Vec<TokenStream
 /// 为带有 `#[config(...)]` 的参数生成从配置读取并解析值的语句。
 ///
 /// 支持基础类型 `String`, `u32`, `i32`, `bool`, `f64`，并根据参数是否为 `Option<T>` 决定是否解包或返回可选值。
-pub fn build_config_value_injector(rfa: &Vec<RouteFnArg>, config_value_stmts: &mut Vec<TokenStream>) {
+pub fn build_config_value_injector(
+    rfa: &Vec<RouteFnArg>,
+    config_value_stmts: &mut Vec<TokenStream>,
+) {
     for rfa in rfa {
         let mark_item = rfa.mark.get("config");
         if let Some(item) = mark_item {
@@ -197,12 +200,13 @@ pub fn build_config_value_injector(rfa: &Vec<RouteFnArg>, config_value_stmts: &m
                 let (is_option, inner) = is_option(&rfa.ty);
                 let parse_expr;
                 if is_option {
-                    parse_expr = prase_expr_by_type(&inner.unwrap(), path, rfa.ident.clone(), false);
+                    parse_expr =
+                        prase_expr_by_type(&inner.unwrap(), path, rfa.ident.clone(), false);
                 } else {
                     parse_expr = prase_expr_by_type(&rfa.ty, path, rfa.ident.clone(), true);
                 }
                 config_value_stmts.push(parse_expr);
-            }else {
+            } else {
                 panic!("config param must be like #[config(\"xx\")] or #[config(path=\"xx\")] ");
             }
         }
@@ -243,13 +247,13 @@ fn prase_expr_by_type(ty: &Type, path: String, ident: syn::Ident, unwrap: bool) 
     };
     if unwrap {
         quote! {
-            let #ident = ::miko::config::config::get_config_value(#path).and_then(|v| {
+            let #ident = ::miko::app::config::get_config_value(#path).and_then(|v| {
                 #expr
             }).unwrap();
         }
-    }else {
+    } else {
         quote! {
-            let #ident = ::miko::config::config::get_config_value(#path).and_then(|v| {
+            let #ident = ::miko::app::config::get_config_value(#path).and_then(|v| {
                 #expr
             });
         }

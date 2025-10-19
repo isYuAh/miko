@@ -1,9 +1,6 @@
 #![allow(non_snake_case)]
-use crate::handler::extractor::from_request::{FRFut, FRPFut};
-use crate::handler::{
-    extractor::from_request::FromRequest, extractor::from_request::FromRequestParts,
-    into_response::IntoResponse,
-};
+use crate::extractor::from_request::{FRFut, FRPFut, FromRequest, FromRequestParts};
+use crate::http::response::into_response::IntoResponse;
 use bytes::Bytes;
 use http_body_util::combinators::BoxBody;
 use hyper::http::request::Parts;
@@ -151,7 +148,7 @@ where
     }
 }
 
-use crate::handler::router::HttpSvc;
+use crate::router::HttpSvc;
 pub use __extract_kind::{PartsTag, ReqTag};
 
 mod __extract_kind {

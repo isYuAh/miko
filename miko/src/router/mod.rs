@@ -1,18 +1,19 @@
+pub mod nested;
+pub mod router_svc;
+
 #[cfg(feature = "ext")]
 use crate::ext::static_svc::StaticSvcBuilder;
+use crate::extractor::{from_request::FromRequest, path_params::PathParams};
 use crate::handler::handler::{DynHandler, handler_to_svc};
-use crate::handler::nested_handler::NestLayer;
-use crate::handler::router_svc::RouterSvc;
-use crate::handler::{
-    extractor::{from_request::FromRequest, path_params::PathParams},
-    handler::{FnOnceTuple, Req, Resp, TypedHandler},
-    into_response::IntoResponse,
-};
+use crate::handler::handler::{FnOnceTuple, Req, Resp, TypedHandler};
+use crate::http::response::into_response::IntoResponse;
+use crate::router::router_svc::RouterSvc;
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::{Method, Request, body::Incoming};
 use matchit::Router as MRouter;
 use miko_core::{IntoMethods, encode_route};
+use nested::NestLayer;
 use std::path::PathBuf;
 use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use tower::{Layer, Service, util::BoxCloneService};
@@ -54,7 +55,7 @@ macro_rules! define_handle_service {
             self.routes
                 .entry(Method::$m.clone())
                 .or_insert_with(|| MRouter::new())
-                .insert(path, svc.clone())
+                .insert(encode_route(path), svc.clone())
                 .unwrap();
             self.path_map
                 .entry(Method::$m.clone())
@@ -319,7 +320,7 @@ impl<S: Send + Sync + 'static> Router<S> {
             self.routes
                 .entry(method.clone())
                 .or_insert_with(|| MRouter::new())
-                .insert(path, svc.clone())
+                .insert(encode_route(path), svc.clone())
                 .unwrap();
             self.path_map
                 .entry(method.clone())

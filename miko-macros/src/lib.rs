@@ -31,7 +31,7 @@ mod toolkit;
 /// 示例：
 /// ```rust
 /// #[get("/hello/{id}")]
-/// async fn hello(#[path] id: i32) -> impl miko::handler::into_response::IntoResponse {
+/// async fn hello(#[path] id: i32) -> impl miko::http::response::into_response::IntoResponse {
 ///     // 处理请求
 /// }
 /// ```
@@ -58,15 +58,15 @@ pub fn miko(attr: TokenStream, item: TokenStream) -> TokenStream {
     let user_statements = &input_fn.block.stmts;
     let set_panic_hook = if str_attr_map.map.contains_key("sse") {
         Some(quote! {
-            ::miko::handler::response::sse::set_sse_panic_hook();
+            ::miko::http::response::sse::set_sse_panic_hook();
         })
     } else {
         None
     };
     let dep_init = if cfg!(feature = "auto") {
         quote! {
-            ::miko::dep::CONTAINER.get_or_init(|| async {
-                ::miko::dep::LazyDependencyContainer::new_()
+            ::miko::dependency_container::CONTAINER.get_or_init(|| async {
+                ::miko::dependency_container::LazyDependencyContainer::new_()
             }).await;
         }
     } else {
@@ -76,16 +76,16 @@ pub fn miko(attr: TokenStream, item: TokenStream) -> TokenStream {
         #[::miko::tokio::main]
         async fn main() {
             #set_panic_hook
-            let mut _config = ::miko::config::config::ApplicationConfig::load_().unwrap_or_default();
-            let mut router = ::miko::handler::router::Router::new();
+            let mut _config = ::miko::app::config::ApplicationConfig::load_().unwrap_or_default();
+            let mut router = ::miko::router::Router::new();
             #dep_init
 
             #( #user_statements )*
 
             router.merge(::miko::auto::collect_global_router());
-            let app = ::miko::application::Application::new(_config, router.take());
+            let app = ::miko::app::Application::new(_config, router.take());
             ::miko::tokio::spawn(async {
-                ::miko::dep::CONTAINER.get().unwrap().read().await.prewarm_all().await;
+                ::miko::dependency_container::CONTAINER.get().unwrap().read().await.prewarm_all().await;
             });
             app.run().await.unwrap();
         }
@@ -170,8 +170,8 @@ pub fn component(attr: TokenStream, input: TokenStream) -> TokenStream {
     quote! {
         #input_struct
         ::miko::inventory::submit! {
-            ::miko::dep::DependencyDefFn(|| {
-                ::miko::dep::DependencyDef {
+            ::miko::dependency_container::DependencyDefFn(|| {
+                ::miko::dependency_container::DependencyDef {
                     type_id: std::any::TypeId::of::<#type_ident>(),
                     prewarm: #prewarm,
                     name: "___",

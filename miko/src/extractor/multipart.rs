@@ -1,4 +1,4 @@
-use crate::handler::extractor::from_request::{FRFut, FromRequest};
+use crate::extractor::from_request::{FRFut, FromRequest};
 use crate::handler::handler::Req;
 use bytes::Bytes;
 use futures::TryStreamExt;

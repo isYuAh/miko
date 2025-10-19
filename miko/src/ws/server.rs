@@ -1,6 +1,6 @@
-use crate::handler::extractor::extractors::Json;
+use crate::extractor::Json;
 use crate::handler::handler::{Req, Resp};
-use crate::handler::ws::toolkit::upgrade_websocket;
+use crate::ws::toolkit::upgrade_websocket;
 use anyhow::anyhow;
 use bytes::Bytes;
 use futures::stream::{SplitSink, SplitStream};

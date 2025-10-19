@@ -1,4 +1,4 @@
-use crate::handler::extractor::path_params::PathParams;
+use crate::extractor::path_params::PathParams;
 use crate::handler::handler::{Req, Resp};
 use hyper::http::uri::PathAndQuery;
 use hyper::{Request, Uri};

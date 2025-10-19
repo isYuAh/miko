@@ -31,7 +31,7 @@ pub fn build_struct_from_query(
             }
         };
         let stmt: FnArg = parse_quote! {
-            ::miko::handler::extractor::extractors::Query(#struct_name { #(#idents),* }): ::miko::handler::extractor::extractors::Query<#struct_name>
+            ::miko::extractor::Query(#struct_name { #(#idents),* }): ::miko::extractor::Query<#struct_name>
         };
         (Some(q_struct), Some(stmt))
     } else {

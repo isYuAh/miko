@@ -1,4 +1,4 @@
-use crate::handler::router::HttpSvc;
+use crate::router::HttpSvc;
 use http_body_util::BodyExt;
 use hyper::{Method, Response};
 use miko_core::fallible_stream_body::FallibleStreamBody;

@@ -2,7 +2,9 @@ use crate::extractor::body::deal_with_body_attr;
 use crate::extractor::path::deal_with_path_attr;
 use crate::route::{RouteAttr, build_register_expr};
 use crate::toolkit::exactors::build_struct_from_query;
-use crate::toolkit::rout_arg::{FnArgResult, IntoFnArgs, RouteFnArg, build_dep_injector, build_config_value_injector};
+use crate::toolkit::rout_arg::{
+    FnArgResult, IntoFnArgs, RouteFnArg, build_config_value_injector, build_dep_injector,
+};
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::quote;
@@ -20,7 +22,7 @@ pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
     // 自动返回值
     let sig = &mut fn_item.sig;
     if matches!(sig.output, syn::ReturnType::Default) {
-        (*sig).output = parse_quote!(-> impl ::miko::handler::into_response::IntoResponse)
+        (*sig).output = parse_quote!(-> impl ::miko::http::response::into_response::IntoResponse)
     }
     let inject_segs: Vec<Stmt> = Vec::new();
     let rfa = RouteFnArg::from_punctuated(&mut sig.inputs);
@@ -45,7 +47,7 @@ pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
         dep_stmts.insert(
             0,
             quote! {
-                let __dep_container = ::miko::dep::get_global_dc().await;
+                let __dep_container = ::miko::dependency_container::get_global_dc().await;
             },
         );
         dep_stmts

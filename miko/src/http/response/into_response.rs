@@ -1,4 +1,4 @@
-use crate::handler::extractor::extractors::Json;
+use crate::extractor::Json;
 use crate::handler::handler::{Resp, RespBody};
 use bytes::Bytes;
 use futures::{Stream, StreamExt};

@@ -1,4 +1,4 @@
-use crate::handler::router::Router;
+use crate::router::Router;
 
 pub struct RouteFlag {
     pub register: fn(Router) -> Router,

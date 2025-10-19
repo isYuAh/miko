@@ -1,3 +1,8 @@
+use crate::handler::handler::Req;
+use crate::http::convert::incoming_to_req::IncomingToInternal;
+use crate::router::HttpSvc;
+use crate::router::Router;
+use config::ApplicationConfig;
 use hyper_util::{
     rt::{TokioExecutor, TokioIo},
     server::conn::auto::Builder as AutoBuilder,
@@ -8,10 +13,7 @@ use tokio::io::Result as IoResult;
 use tokio::net::TcpListener;
 use tracing;
 
-use crate::handler::handler::Req;
-use crate::handler::incoming_to_req::IncomingToInternal;
-use crate::handler::router::HttpSvc;
-use crate::{config::config::ApplicationConfig, handler::router::Router};
+pub mod config;
 
 /// 应用程序入口，负责持有配置与路由，并启动 HTTP 服务
 pub struct Application {

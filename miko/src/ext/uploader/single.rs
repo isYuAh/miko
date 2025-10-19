@@ -1,8 +1,8 @@
 use crate::ext::uploader::{FileField, UploadedFile};
-use crate::handler::extractor::from_request::FromRequest;
-use crate::handler::extractor::multipart::Multipart;
+use crate::extractor::from_request::FromRequest;
+use crate::extractor::multipart::Multipart;
 use crate::handler::handler::Req;
-use crate::handler::into_response::IntoResponse;
+use crate::http::response::into_response::IntoResponse;
 use hyper::StatusCode;
 use miko_core::Resp;
 use miko_core::fast_builder::ResponseBuilder;
@@ -67,9 +67,7 @@ where
                 Ok(file) => {
                     ResponseBuilder::ok(format!("uploaded file {}", file.original_filename))
                 }
-                Err(e) => {
-                    Ok((StatusCode::BAD_REQUEST, e.into_response()).into_response())
-                }
+                Err(e) => Ok((StatusCode::BAD_REQUEST, e.into_response()).into_response()),
             }
         })
     }

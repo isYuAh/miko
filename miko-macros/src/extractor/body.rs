@@ -19,7 +19,7 @@ pub fn deal_with_body_attr(rfa: &RouteFnArg) -> FnArgResult {
                     ))
                 } else {
                     FnArgResult::Replace(parse_quote!(
-                        ::miko::handler::extractor::extractors::Json(#ident): ::miko::handler::extractor::extractors::Json<#ty>
+                        ::miko::extractor::Json(#ident): ::miko::extractor::Json<#ty>
                     ))
                 }
             }
@@ -32,7 +32,7 @@ pub fn deal_with_body_attr(rfa: &RouteFnArg) -> FnArgResult {
                     ))
                 } else {
                     FnArgResult::Replace(parse_quote!(
-                        ::miko::handler::extractor::extractors::Json(#ident): ::miko::handler::extractor::extractors::Json<#ty>
+                        ::miko::extractor::Json(#ident): ::miko::extractor::Json<#ty>
                     ))
                 }
             }

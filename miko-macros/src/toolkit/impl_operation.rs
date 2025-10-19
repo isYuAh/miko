@@ -44,7 +44,7 @@ pub fn inject_deps(
             let pat_ident = &inner.unwrap();
             if depend_get_stmts.is_empty() {
                 depend_get_stmts.push(quote! {
-                    let container = ::miko::dep::CONTAINER.get().unwrap().read().await;
+                    let container = ::miko::dependency_container::CONTAINER.get().unwrap().read().await;
                 })
             }
             depend_get_stmts.push(quote! {
