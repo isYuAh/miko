@@ -15,11 +15,16 @@ use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 use std::sync::Arc;
 
+/// JSON 请求体提取器，将请求体反序列化为 T
 #[derive(Debug)]
 pub struct Json<T>(pub T);
+/// URL 查询字符串提取器，将 ?a=1&b=2 解析为 T
 pub struct Query<T>(pub T);
+/// 路径参数提取器，从 PathParams 中提取首个段并转换为 T
 pub struct Path<T>(pub T);
+/// 全局状态提取器，配合 Router::with_state 提供的 Arc<T>
 pub struct State<T>(pub Arc<T>);
+/// application/x-www-form-urlencoded 表单提取器
 pub struct Form<T>(pub T);
 
 impl<S, T> FromRequest<S> for Json<T>

@@ -8,6 +8,13 @@ use proc_macro2::{Ident, Span};
 use quote::quote;
 use syn::{ItemFn, Stmt, parse_quote};
 
+/// 处理 `#[route(...)]` 系列宏的核心处理器。
+///
+/// 主要职责：
+/// - 修改函数签名（例如自动设置返回类型）；
+/// - 解析并重写参数以注入 path/body/query/dep/config 等提取器或获取语句；
+/// - 生成临时的 Query 结构体（如需）；
+/// - 将用户函数体和自动生成的注入语句合并为最终的宏展开。
 pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
     let fn_name = fn_item.sig.ident.clone();
     // 自动返回值

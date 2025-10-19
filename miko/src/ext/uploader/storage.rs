@@ -3,6 +3,7 @@ use std::fmt::{Debug, Formatter};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+/// 将上传文件保存到磁盘的存储器
 #[derive(Clone)]
 pub struct DiskStorage {
     pub root: PathBuf,
@@ -45,6 +46,7 @@ impl UploaderProcesser for DiskStorage {
     }
 }
 impl DiskStorage {
+    /// 创建一个磁盘存储器
     pub fn new(root: impl Into<PathBuf>, config: DiskStorageConfig) -> Self {
         Self {
             root: root.into(),
@@ -53,6 +55,7 @@ impl DiskStorage {
     }
 }
 
+/// 磁盘存储配置：文件大小/扩展名/MIME 限制以及文件名映射
 #[derive(Clone)]
 pub struct DiskStorageConfig {
     pub max_size: Option<usize>,
@@ -81,18 +84,22 @@ impl Default for DiskStorageConfig {
     }
 }
 impl DiskStorageConfig {
+    /// 限制最大文件尺寸（字节）
     pub fn max_size(mut self, max_size: usize) -> Self {
         self.max_size = Some(max_size);
         self
     }
+    /// 允许的扩展名白名单（不含点），如 ["png", "jpg"]
     pub fn allowed_extensions(mut self, allowed_extensions: Vec<String>) -> Self {
         self.allowed_extensions = Some(allowed_extensions);
         self
     }
+    /// 允许的 MIME 类型白名单，如 ["image/png"]
     pub fn allowed_mime_types(mut self, allowed_mime_types: Vec<String>) -> Self {
         self.allowed_mime_types = Some(allowed_mime_types);
         self
     }
+    /// 文件名映射，便于重命名（如追加时间戳/UUID）
     pub fn filename_mapper(
         mut self,
         filename_mapper: impl Fn(&str) -> String + Send + Sync + 'static,

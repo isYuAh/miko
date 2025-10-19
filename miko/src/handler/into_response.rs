@@ -6,6 +6,11 @@ use http_body_util::{BodyExt, Full, StreamBody};
 use hyper::{Response, StatusCode, body::Frame};
 use miko_core::fast_builder::ResponseBuilder;
 use serde::Serialize;
+
+/// 将一个类型转换为 HTTP 响应的通用能力
+///
+/// 你的 handler 返回值只要实现了该 trait，就可以被框架自动转换为响应。
+/// 框架已为 String、&str、Json<T>、Result、()、(StatusCode, T) 等常见类型提供实现。
 pub trait IntoResponse {
     fn into_response(self) -> Resp;
 }
@@ -42,6 +47,7 @@ impl IntoResponse for Resp {
     }
 }
 
+/// SSE 响应包装器，将一个字节流包装为 text/event-stream 响应
 pub struct SSE<T>(pub T);
 
 impl<S, E> IntoResponse for SSE<S>

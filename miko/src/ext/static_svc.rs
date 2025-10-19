@@ -15,12 +15,14 @@ use tower::util::BoxCloneService;
 use tower::{Layer, Service};
 use tower_http::cors::CorsLayer;
 
+/// 静态文件服务，实现目录下文件的按路径映射与可选 SPA 回退
 #[derive(Clone)]
 pub struct StaticSvc {
     pub root: Arc<PathBuf>,
     pub spa_fallback: bool,
 }
 impl StaticSvc {
+    /// 构建一个静态服务的 Builder
     pub fn builder(root: impl Into<PathBuf>) -> StaticSvcBuilder {
         StaticSvcBuilder::new(root)
     }
@@ -63,12 +65,14 @@ impl StaticSvc {
     }
 }
 
+/// 静态文件服务构建器
 pub struct StaticSvcBuilder {
     pub root: PathBuf,
     pub spa_fallback: bool,
     pub cors_layer: Option<CorsLayer>,
 }
 impl StaticSvcBuilder {
+    /// 创建构建器
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
             root: root.into(),
@@ -76,18 +80,22 @@ impl StaticSvcBuilder {
             cors_layer: None,
         }
     }
+    /// 启用/关闭单页应用回退（当命中文件不存在时回退到 index.html）
     pub fn with_spa_fallback(mut self, spa_fallback: bool) -> Self {
         self.spa_fallback = spa_fallback;
         self
     }
+    /// 配置 CORS Layer
     pub fn with_cors(mut self, cors_layer: CorsLayer) -> Self {
         self.cors_layer = Some(cors_layer);
         self
     }
+    /// 允许任意跨域（开发便捷）
     pub fn cors_any(mut self) -> Self {
         self.cors_layer = Some(CorsLayer::permissive());
         self
     }
+    /// 构建为可挂载的 Service
     pub fn build(self) -> HttpSvc<Req> {
         let service = StaticSvc {
             root: Arc::new(self.root),

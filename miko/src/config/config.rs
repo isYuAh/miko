@@ -8,12 +8,14 @@ use toml::map::Map;
 
 static CONFIG: OnceLock<Value> = OnceLock::new();
 
+/// 应用层配置（监听地址与端口）
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ApplicationConfig {
     pub addr: String,
     pub port: u16,
 }
 impl ApplicationConfig {
+    /// 从配置文件加载 ApplicationConfig，失败则返回错误
     pub fn load_() -> Result<Self, Box<dyn std::error::Error>> {
         let base: Value = load_config_section("application")?;
         Ok(base
@@ -30,6 +32,7 @@ impl Default for ApplicationConfig {
     }
 }
 impl ApplicationConfig {
+    /// 便于回退时构建默认 toml 值的辅助函数
     pub fn to_hash_map(&self) -> HashMap<String, String> {
         let mut map = HashMap::new();
         map.insert("addr".to_string(), self.addr.clone());
@@ -54,6 +57,7 @@ fn merge_toml(base: &mut Value, other: &Value) {
     }
 }
 
+/// 读取并合并配置：config.toml 与 dev/prod 额外文件
 pub fn load_and_merge_toml() -> Result<Value, Error> {
     let content = std::fs::read_to_string("./config.toml").inspect_err(|e| {
         tracing::warn!("Failed to read config.toml: {:?}", e);
@@ -72,6 +76,7 @@ pub fn load_and_merge_toml() -> Result<Value, Error> {
     Ok(base)
 }
 
+/// 获取全局配置值（延迟加载并缓存）
 pub fn get_config() -> &'static Value {
     CONFIG.get_or_init(|| {
         let val = load_and_merge_toml();
@@ -88,6 +93,7 @@ pub fn get_config() -> &'static Value {
     })
 }
 
+/// 读取指定 section 并反序列化为 T
 pub fn load_config_section<T: DeserializeOwned>(section: &str) -> Result<T, Error> {
     let config = get_config();
     let section_value = config
@@ -100,7 +106,7 @@ pub fn load_config_section<T: DeserializeOwned>(section: &str) -> Result<T, Erro
         .map_err(|e| anyhow!("Failed to deserialize section '[{}]': {:?}", section, e).into())
 }
 
-
+/// 从一个 toml::Value 开始，按路径（如 a.b.c）获取子值
 pub fn get_toml_value_by_path<'a>(value: &'a Value, path: &str) -> Option<&'a Value> {
     let mut current = Some(value);
     for key in path.split('.') {
@@ -108,6 +114,7 @@ pub fn get_toml_value_by_path<'a>(value: &'a Value, path: &str) -> Option<&'a Va
     }
     current
 }
+/// 直接从全局配置中按路径取值
 pub fn get_config_value(path: &str) -> Option<&Value> {
     get_toml_value_by_path(get_config(), path)
 }

@@ -1,6 +1,11 @@
 use crate::toolkit::rout_arg::{FnArgResult, RouteFnArg};
 use syn::{Type, parse_quote};
 
+/// 处理带有 `#[body]` 标记或默认按类型推断的 body 参数。
+///
+/// - 如果显式标注 `str` 则保持原始类型（字符串）；
+/// - 否则默认替换为 Json 提取器 `Json<T>`；
+/// - 对于未标注但类型为 `String` 的参数也直接保持字符串类型。
 pub fn deal_with_body_attr(rfa: &RouteFnArg) -> FnArgResult {
     if rfa.mark.contains_key("body") {
         let ident = rfa.ident.clone();

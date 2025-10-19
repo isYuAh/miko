@@ -6,6 +6,9 @@ use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{FnArg, ImplItem, ImplItemFn, Pat, PatIdent};
 
+/// 在 `impl` 项目列表中查找名为 `new` 的构造函数并返回其引用（如果存在）。
+///
+/// 用于在宏中检测并提取异步构造函数以进行依赖注入分析。
 pub fn get_constructor(items: &Vec<ImplItem>) -> Option<&ImplItemFn> {
     for item in items {
         if let ImplItem::Fn(method) = item {
@@ -17,6 +20,10 @@ pub fn get_constructor(items: &Vec<ImplItem>) -> Option<&ImplItemFn> {
     None
 }
 
+/// 从构造函数参数列表中生成依赖注入的获取语句并收集参数标识符。
+///
+/// 要求构造函数参数为 `Arc<T>` 形式；该函数会为第一个依赖注入语句插入读取全局容器的代码片段，
+/// 并为每个参数追加 `let <ident> = container.get::<T>().await.clone();` 之类的语句，同时收集参数名到 `arg_idents`。
 pub fn inject_deps(
     args: &Punctuated<FnArg, Comma>,
     depend_get_stmts: &mut Vec<TokenStream>,

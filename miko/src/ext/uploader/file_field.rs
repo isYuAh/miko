@@ -7,6 +7,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::AsyncWriteExt;
 
+/// 表示一个原始上传字段（文件），可作为异步字节流读取
 #[derive(Debug)]
 pub struct FileField {
     pub original_filename: String,
@@ -14,6 +15,7 @@ pub struct FileField {
     pub field: Field<'static>,
 }
 
+/// 已处理（存储）后的文件描述
 #[derive(Debug)]
 pub struct UploadedFile {
     pub original_filename: String,
@@ -31,6 +33,7 @@ impl Stream for FileField {
 }
 
 impl FileField {
+    /// 从 multer::Field 构建 FileField
     pub fn from(field: Field<'static>) -> Self {
         let filename = field.file_name().map(|s| s.to_string()).unwrap_or_default();
         let content_type = field.content_type().map(|v| v.clone());
@@ -43,6 +46,7 @@ impl FileField {
 }
 
 impl FileField {
+    /// 将文件保存到指定目录与文件名，返回已上传文件信息
     pub async fn transfer_to(
         mut self,
         path: impl Into<PathBuf>,
@@ -75,6 +79,7 @@ impl FileField {
     }
 }
 
+/// 文件保存时的简单限制配置（如最大尺寸）
 pub struct FileTransferConfig {
     pub max_size: Option<usize>,
 }

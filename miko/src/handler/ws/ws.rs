@@ -15,34 +15,32 @@ use tokio_tungstenite::WebSocketStream;
 use tungstenite::protocol::{Role, WebSocketConfig};
 use tungstenite::{Error, Message, Utf8Bytes};
 
-#[derive(Hash, Eq, PartialEq, Debug, Clone)]
-pub enum WsEvent {
-    Text,
-    Binary,
-    Close,
-    Ping,
-    Pong,
-}
-
+/// WebSocket 连接封装，提供便捷的发送/接收/split
 pub struct WsSocket {
     io: WebSocketStream<TokioIo<Upgraded>>,
 }
 impl WsSocket {
+    /// 基于底层流创建
     pub fn new(io: WebSocketStream<TokioIo<Upgraded>>) -> WsSocket {
         Self { io }
     }
+    /// 发送一条消息
     pub async fn send(&mut self, msg: impl IntoMessage) -> tungstenite::Result<()> {
         self.io.send(msg.into_message()).await
     }
+    /// 接收下一条消息
     pub async fn next(&mut self) -> Option<Result<Message, Error>> {
         self.io.next().await
     }
+    /// 主动关闭连接
     pub async fn close(&mut self) -> tungstenite::Result<()> {
         self.io.close(None).await
     }
+    /// 分离底层读写端
     pub fn split_inner(self) -> (WsSendSink, WsRecvStream) {
         self.io.split()
     }
+    /// 分离为发送端与接收端（发送端通过 mpsc 发送，避免并发 Borrow 问题）
     pub fn split(self) -> (WsSender, WsReceiver, JoinHandle<()>) {
         let (mut w, r) = self.io.split();
         let (tx, mut rx) = mpsc::channel::<Message>(100);
@@ -65,6 +63,7 @@ impl WsSocket {
     }
 }
 
+/// 可转换为 WebSocket Message 的类型
 pub trait IntoMessage {
     fn into_message(self) -> Message;
 }
@@ -106,6 +105,7 @@ impl IntoMessage for &[u8] {
     }
 }
 
+/// 将当前请求升级为 WebSocket 并在后台运行你的异步任务
 pub fn spawn_ws_event<F, Fut>(
     task: F,
     req: &mut Req,
@@ -134,8 +134,13 @@ where
     });
     Ok(resp)
 }
+
+/// 底层 Split 类型别名
 pub type WsSendSink = SplitSink<WebSocketStream<TokioIo<Upgraded>>, Message>;
+/// 底层 Split 类型别名
 pub type WsRecvStream = SplitStream<WebSocketStream<TokioIo<Upgraded>>>;
+
+/// WebSocket 发送端（基于 mpsc 管道，便于跨任务发送）
 #[derive(Clone)]
 pub struct WsSender {
     inner: mpsc::Sender<Message>,
@@ -145,6 +150,8 @@ impl WsSender {
         Self { inner }
     }
 }
+
+/// WebSocket 接收端（包装 SplitStream）
 pub struct WsReceiver {
     inner: WsRecvStream,
 }
@@ -154,11 +161,13 @@ impl WsReceiver {
     }
 }
 impl WsSender {
+    /// 发送一条消息
     pub async fn send(&mut self, msg: impl IntoMessage) -> Result<(), SendError<Message>> {
         self.inner.send(msg.into_message()).await
     }
 }
 impl WsReceiver {
+    /// 接收下一条消息
     pub async fn next(&mut self) -> Option<Result<Message, Error>> {
         self.inner.next().await
     }

@@ -17,8 +17,12 @@ use std::path::PathBuf;
 use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use tower::{Layer, Service, util::BoxCloneService};
 
+/// 生成各 HTTP 方法的简化注册函数（如 get/post/...）
+///
+/// 这些函数会将给定的 handler 绑定到指定 path 上。
 macro_rules! define_method {
     ($name:ident, $m:ident) => {
+        /// 将处理函数绑定到给定路径上（此函数注册指定的 HTTP 方法）
         pub fn $name<F, A, Fut, R, M>(&mut self, path: &str, handler: F) -> &mut Self
         where
             F: FnOnceTuple<A, Output = Fut> + Clone + Send + Sync + 'static,
@@ -42,8 +46,10 @@ macro_rules! define_method {
     };
 }
 
+/// 生成绑定现有 Service 的便捷函数（如 get_service/post_service/...）
 macro_rules! define_handle_service {
     ($name:ident, $m:ident) => {
+        /// 将一个 Service 直接挂载到给定路径（此函数注册指定的 HTTP 方法）
         pub fn $name(&mut self, path: &str, svc: HttpSvc<Req>) -> &mut Self {
             self.routes
                 .entry(Method::$m.clone())
@@ -59,13 +65,20 @@ macro_rules! define_handle_service {
     };
 }
 
+/// Tower 兼容的请求与服务别名
 pub type HttpReq = Request<Incoming>;
+/// Tower 兼容的 Service 类型别名
 pub type HttpSvc<T = HttpReq> = BoxCloneService<T, Resp, Infallible>;
 
+/// 路由器，负责注册路由、挂载中间件/服务并进行请求分发
 pub struct Router<S = ()> {
+    /// 已注册的路由表（按方法分类）
     pub routes: HashMap<Method, MRouter<HttpSvc<Req>>>,
+    /// 共享的全局状态，可由 State<T> 提取
     pub state: Arc<S>,
+    /// 待应用的中间件层
     pub layers: Vec<Arc<dyn Fn(HttpSvc<Req>) -> HttpSvc<Req> + Send + Sync>>,
+    /// 用于 nest/merge 的路径映射索引
     pub path_map: HashMap<Method, HashMap<String, HttpSvc<Req>>>,
 }
 impl<S> Clone for Router<S> {
@@ -80,6 +93,7 @@ impl<S> Clone for Router<S> {
 }
 
 impl<S: Send + Sync + 'static> Router<S> {
+    /// 根据方法与路径查找对应的处理 Service，并返回路径参数
     pub fn find_handler(&self, method: &Method, path: &str) -> Option<(HttpSvc<Req>, PathParams)> {
         if let Some(router) = self.routes.get(method) {
             match router.at(path) {
@@ -93,6 +107,7 @@ impl<S: Send + Sync + 'static> Router<S> {
             None
         }
     }
+    /// 直接处理一个请求（内部使用），会自动写入 PathParams 并执行 Service
     pub async fn handle(&self, method: &Method, path: &str, mut req: Req) -> Resp {
         if let Some(router) = self.routes.get(method) {
             match router.at(path) {
@@ -122,6 +137,7 @@ impl<S: Send + Sync + 'static> Router<S> {
 }
 
 impl Router {
+    /// 创建一个空路由器
     pub fn new() -> Self {
         Self {
             routes: HashMap::new(),
@@ -133,9 +149,10 @@ impl Router {
 }
 
 impl<S: Send + Sync + 'static> Router<S> {
-    /// 将一个handler挂载到path上
+    /// 将处理函数挂载到指定 path
     ///
-    /// - 派生了get post put delete head options trace connect patch，可以指定方法
+    /// - 支持一次性注册多个方法：get/post/put/delete/head/options/trace/connect/patch
+    /// - 处理函数参数由一组 Extractor 决定，返回值需实现 IntoResponse
     pub fn route<F, A, Fut, R, M>(
         &mut self,
         method: impl IntoMethods,
@@ -185,9 +202,9 @@ impl<S: Send + Sync + 'static> Router<S> {
 }
 
 impl<S: Send + Sync + 'static> Router<S> {
-    /// 挂载state，可以被State()提取器获取
+    /// 挂载全局状态，供 State<T> 提取
     ///
-    /// 注意是生成类型不同的新Router，所以需要重新let赋值
+    /// 注意：该方法会返回新的 Router<T> 类型，请重新赋值接收
     pub fn with_state<T>(self, state: T) -> Router<T> {
         Router {
             routes: self.routes,
@@ -197,7 +214,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         }
     }
 
-    /// 合并两个Router
+    /// 合并另一个 Router，所有路由与索引一并合并
     pub fn merge<T>(&mut self, other: Router<T>) -> &mut Self {
         for (method, router) in other.routes {
             self.routes
@@ -220,11 +237,9 @@ impl<S: Send + Sync + 'static> Router<S> {
         self
     }
 
-    /// 挂载一个Router到某个特定前缀
+    /// 将另一个 Router 挂载到指定前缀
     ///
-    /// 被挂载的Router内部的路由获取的是去除前缀的uri和path_params
-    ///
-    /// 如前缀为/api，访问/api/users，则内部路由感知到的为/users
+    /// 被挂载的 Router 内部匹配到的是去除前缀后的路径与参数
     pub fn nest<T>(&mut self, prefix: &str, mut other: Router<T>) -> &mut Self {
         let prefix = prefix.trim_end_matches('/').to_string();
 
@@ -247,11 +262,9 @@ impl<S: Send + Sync + 'static> Router<S> {
         self
     }
 
-    /// 挂载service到某个前缀上的所有路由，所有常用Method
+    /// 将一个 Service 挂载到前缀下的所有路由（常用方法）
     ///
-    /// 不需要指定{*rest}，会自动附加
-    ///
-    /// 如果需要自己控制，使用`service`函数
+    /// 无需显式声明 `{*rest}`，会自动追加；如需手动控制，请使用 [`Router::service`]
     pub fn nest_service(&mut self, prefix: &str, svc: HttpSvc<Req>) {
         let prefix = prefix.trim_end_matches('/').to_string();
         let layered = NestLayer::new(&prefix).layer(svc);
@@ -289,8 +302,9 @@ impl<S: Send + Sync + 'static> Router<S> {
         }
     }
 
-    /// 挂载service到所有Method
-    /// 派生了get_service等单独挂载的方法
+    /// 将一个 Service 同时挂载到所有常用 HTTP 方法
+    ///
+    /// 同时也派生了若干单方法版本（如 get_service 等）
     pub fn service(&mut self, path: &str, svc: HttpSvc<Req>) {
         let methods = [
             Method::GET,
@@ -314,6 +328,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         }
     }
 
+    /// 追加一个中间件 Layer，稍后在 into_tower_service 时顺序应用
     pub fn with_layer<L>(&mut self, layer: L) -> &mut Self
     where
         L: Layer<HttpSvc<Req>> + Send + Sync + 'static,
@@ -327,6 +342,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         self
     }
 
+    /// 将路由器转换为 Tower Service，自动应用之前注册的 Layer
     pub fn into_tower_service(mut self) -> HttpSvc<Req> {
         let layers = std::mem::take(&mut self.layers);
         let mut svc: HttpSvc<Req> = BoxCloneService::new(RouterSvc { router: self });
@@ -336,7 +352,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         svc
     }
 
-    /// 从&mut借用获取所有权，使用mem::replace实现
+    /// 从可变借用中取出所有权，便于在构建链路中重组 Router
     pub fn take(&mut self) -> Self {
         std::mem::replace(
             self,
@@ -352,7 +368,7 @@ impl<S: Send + Sync + 'static> Router<S> {
 
 #[cfg(feature = "ext")]
 impl<S: Send + Sync + 'static> Router<S> {
-    /// 静态文件服务
+    /// 简易的静态文件服务
     pub fn static_svc<F>(
         &mut self,
         prefix: &str,
@@ -370,7 +386,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         self.nest_service(prefix, builder.build())
     }
 
-    /// 允许任意跨域
+    /// 允许任意跨域（permissive），适合开发或简单场景
     pub fn cors_any(&mut self) {
         use tower_http::cors::CorsLayer;
         self.with_layer(CorsLayer::permissive());

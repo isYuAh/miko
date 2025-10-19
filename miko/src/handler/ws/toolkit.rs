@@ -5,8 +5,10 @@ use miko_core::{Req, Resp};
 use tokio_tungstenite::WebSocketStream;
 use tungstenite::{error::ProtocolError};
 
+/// 升级当前 HTTP 请求为 WebSocket，返回 101 响应和 OnUpgrade 句柄
 pub type WsStream = WebSocketStream<TokioIo<hyper::upgrade::Upgraded>>;
 
+/// 执行协议握手并返回 101 Switching Protocols 响应与升级句柄
 pub fn upgrade_websocket(req: &mut Req) -> Result<(Resp, OnUpgrade), anyhow::Error> {
     let key = req.headers().get(hyper::header::SEC_WEBSOCKET_KEY).ok_or(
         ProtocolError::MissingSecWebSocketKey
@@ -26,6 +28,7 @@ pub fn upgrade_websocket(req: &mut Req) -> Result<(Resp, OnUpgrade), anyhow::Err
     Ok((resp, on_upgrade))
 }
 
+/// 判断请求是否为 WebSocket 升级请求
 pub fn is_upgrade_request<B>(request: &hyper::Request<B>) -> bool {
 	header_contains_value(request.headers(), CONNECTION, "Upgrade")
 		&& header_contains_value(request.headers(), hyper::header::UPGRADE, "websocket")

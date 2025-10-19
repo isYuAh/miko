@@ -34,6 +34,9 @@ impl Parse for RouteAttr {
     }
 }
 
+/// 为路由属性生成注册路由到全局路由器（inventory 提交）的代码片段。
+///
+/// 会根据 `RouteAttr` 中的 method 列表生成对不同 HTTP 方法的 `router.route(...)` 调用。
 pub fn build_register_expr(ra: &RouteAttr, fn_name: &Ident) -> TokenStream {
     let path = ra.path.clone();
     let methods = if let Some(method) = ra.method.clone() {

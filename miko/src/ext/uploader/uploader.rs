@@ -4,6 +4,7 @@ use miko_core::Req;
 use std::sync::Arc;
 use tower::util::BoxCloneService;
 
+/// 上传功能入口，提供构建不同上传服务的便捷方法
 pub struct Uploader {}
 
 impl Uploader {

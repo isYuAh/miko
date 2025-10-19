@@ -12,11 +12,13 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use tower::Service;
 
+/// 单文件上传服务（自动选择第一个文件字段进行处理）
 #[derive(Clone)]
 pub struct SingleUploader<H> {
     pub(crate) inner: Arc<H>,
 }
 
+/// 上传处理器：将一个上传字段处理为最终的 UploadedFile
 pub trait UploaderProcesser {
     fn process(
         &self,

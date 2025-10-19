@@ -10,6 +10,31 @@ mod extractor;
 mod route;
 mod toolkit;
 
+/// 标准路由属性宏（用于自定义路由）
+///
+/// 用法：在处理请求的函数上使用 `#[route(...)]` 或派生宏如 `#[get(...)]`。
+/// 该宏根据属性（path/method）和参数注解生成路由处理器。
+///
+/// 参数标注：
+/// - `#[path]`：从路径中提取（如 `/users/{id}`）；
+/// - `#[query]`：从查询字符串构建结构并注入；
+/// - `#[body]`：从请求体反序列化（默认 JSON；标记 `str` 可保留为 String）；
+/// - `#[dep]`：注入全局依赖（参数类型通常为 `Arc<T>`，需先注册该组件）；
+/// - `#[config("key")]`/`#[config(path = "key")]`：从应用配置读取并解析为参数类型。
+///
+/// 注意：
+/// - 仅当同时启用 `auto` feature 且应用通过 `#[miko]` 启动时，框架才会自动收集并注册由这些宏生成的路由；
+/// - 若未启用 `auto`，`route`/派生宏及 `#[dep]` 不会触发框架级的自动注册或依赖注入——此时需要在你的初始化代码中手动注册路由与依赖；
+///
+/// 建议：处理器应声明为 `async fn`；若未显式返回类型，宏会自动设置为实现 `IntoResponse` 的类型。
+///
+/// 示例：
+/// ```rust
+/// #[get("/hello/{id}")]
+/// async fn hello(#[path] id: i32) -> impl miko::handler::into_response::IntoResponse {
+///     // 处理请求
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
     let args = parse_macro_input!(attr as RouteAttr);
@@ -69,6 +94,9 @@ pub fn miko(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 macro_rules! derive_route_macro {
     ($macro_name: ident, $method_ident:ident) => {
+        #[doc = concat!("简写：等价于 `#[route(..., method = \"", stringify!($method_ident), "\" )]`。\n\n",
+                         "仅当启用 `auto` feature 且应用通过 `#[miko]` 启动时，框架才会自动注册由该宏生成的路由；\n",
+                         "否则该宏仅生成处理函数，路由需在初始化代码中手动注册。")]
         #[proc_macro_attribute]
         pub fn $macro_name(attr: TokenStream, item: TokenStream) -> TokenStream {
             let mut args = syn::parse_macro_input!(attr as RouteAttr);
@@ -98,6 +126,25 @@ derive_route_macro!(trace, TRACE);
 derive_route_macro!(connect, CONNECT);
 
 #[cfg(feature = "auto")]
+/// 组件宏：将 `impl` 中的构造函数注册为可由框架管理的可注入组件。
+///
+/// 使用：
+/// - 在 `impl` 上添加 `#[component]`（可带 `prewarm`）以将该类型注册为预热组件；
+/// - 构造函数应为 `async fn new(...) -> Self`；构造函数的参数可以声明其它组件的依赖（以 `Arc<T>` 形式）；
+/// - 注册后的组件可在处理器参数上使用 `#[dep]` 标注注入（当启用 `auto` 时）。
+///
+/// `prewarm` 生效条件：仅在应用通过 `#[miko]` 启动（并启用 `auto`）时才会在启动阶段触发预热。
+///
+/// 示例：
+/// ```rust
+/// #[component(prewarm)]
+/// impl MyService {
+///     async fn new(dep: std::sync::Arc<Other>) -> Self { /* ... */ }
+/// }
+///
+/// // 在处理器中注入：
+/// async fn handler(#[dep] svc: std::sync::Arc<MyService>) { /* ... */ }
+/// ```
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, input: TokenStream) -> TokenStream {
     let args = syn::parse_macro_input!(attr as StrAttrMap);

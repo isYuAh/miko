@@ -26,6 +26,10 @@ impl Debug for RouteFnArg {
 }
 
 impl RouteFnArg {
+    /// 从函数参数的 Punctuated 列表中解析出 RouteFnArg 向量。
+    ///
+    /// 该函数会处理 `FnArg::Typed` 参数，提取参数标识符、类型及自定义属性（如 `#[path]`、`#[body]`、`#[dep]`、`#[config]` 等），
+    /// 并将解析结果打包为 `RouteFnArg`，以便后续宏展开使用。
     pub fn from_punctuated(
         inputs: &mut syn::punctuated::Punctuated<FnArg, syn::token::Comma>,
     ) -> Vec<RouteFnArg> {
@@ -105,6 +109,8 @@ impl IntoFnArgs for Vec<RouteFnArg> {
     }
 }
 
+/// 判断给定类型是否为 `Option<T>`，
+/// 返回 (is_option, Some(inner_type)) 或 (false, None)
 pub fn is_option(ty: &Type) -> (bool, Option<Type>) {
     let Type::Path(TypePath { path, .. }) = ty else {
         return (false, None);
@@ -127,6 +133,8 @@ pub fn is_option(ty: &Type) -> (bool, Option<Type>) {
     }
 }
 
+/// 判断给定类型是否为 `Arc<T>`，
+/// 返回 (is_arc, Some(inner_type)) 或 (false, None)
 pub fn is_arc(ty: &Type) -> (bool, Option<Type>) {
     let Type::Path(TypePath { path, .. }) = ty else {
         return (false, None);
@@ -157,6 +165,9 @@ pub enum FnArgResult {
     RemoveAttr,
 }
 
+/// 为带有 `#[dep]` 标记的参数生成依赖注入的语句。
+///
+/// 该函数会为每个标记为 `dep` 的参数生成从全局依赖容器中异步获取该依赖的语句片段，并追加到 `dep_stmts`。
 pub fn build_dep_injector(rfa: &Vec<RouteFnArg>, dep_stmts: &mut Vec<TokenStream>) {
     for rfa in rfa {
         if rfa.mark.contains_key("dep") {
@@ -175,6 +186,9 @@ pub fn build_dep_injector(rfa: &Vec<RouteFnArg>, dep_stmts: &mut Vec<TokenStream
     }
 }
 
+/// 为带有 `#[config(...)]` 的参数生成从配置读取并解析值的语句。
+///
+/// 支持基础类型 `String`, `u32`, `i32`, `bool`, `f64`，并根据参数是否为 `Option<T>` 决定是否解包或返回可选值。
 pub fn build_config_value_injector(rfa: &Vec<RouteFnArg>, config_value_stmts: &mut Vec<TokenStream>) {
     for rfa in rfa {
         let mark_item = rfa.mark.get("config");
@@ -189,7 +203,7 @@ pub fn build_config_value_injector(rfa: &Vec<RouteFnArg>, config_value_stmts: &m
                 }
                 config_value_stmts.push(parse_expr);
             }else {
-                panic!("config param must be like #[config(\"xx\")] or #[config(path=\"xx\")]");
+                panic!("config param must be like #[config(\"xx\")] or #[config(path=\"xx\")] ");
             }
         }
     }

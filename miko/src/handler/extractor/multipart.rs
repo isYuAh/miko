@@ -14,12 +14,17 @@ use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio_util::io::StreamReader;
 
+/// 原始 Multipart 访问器（底层包装 multer::Multipart），用于自定义解析流程
 pub struct Multipart(pub multer::Multipart<'static>);
+
+/// Multipart 解析结果，包含字段和值、文件集合
 #[derive(Debug)]
 pub struct MultipartResult {
     pub fields: HashMap<String, Vec<String>>,
     pub files: HashMap<String, Vec<MultipartFile>>,
 }
+
+/// 表示一个上传的文件（已落盘到临时文件）
 #[derive(Debug)]
 pub struct MultipartFile {
     pub filename: String,
@@ -27,6 +32,8 @@ pub struct MultipartFile {
     pub content_type: Option<Mime>,
     pub linker: MultipartFileDiskLinker,
 }
+
+/// 已保存到磁盘的临时文件链接器，提供便捷操作
 #[derive(Debug)]
 pub struct MultipartFileDiskLinker {
     pub file: File,
@@ -36,19 +43,23 @@ pub struct MultipartFileDiskLinker {
 }
 
 impl MultipartFileDiskLinker {
+    /// 将临时文件复制到指定路径
     pub async fn transfer_to(&self, path: impl Into<PathBuf>) -> Result<u64, std::io::Error> {
         Ok(tokio::fs::copy(self.file_path.clone(), path.into()).await?)
     }
+    /// 以 UTF-8 读取整个文件内容为字符串
     pub async fn read_to_string(&mut self) -> Result<String, std::io::Error> {
         let mut buf = String::new();
         self.file.read_to_string(&mut buf).await?;
         Ok(buf)
     }
+    /// 读取所有字节并关闭文件句柄
     pub async fn read_and_drop_file(mut self) -> Result<Bytes, std::io::Error> {
         let mut buf = Vec::new();
         self.file.read_to_end(&mut buf).await?;
         Ok(Bytes::from(buf))
     }
+    /// 读取文件元数据
     pub async fn metadata(&self) -> std::io::Result<Metadata> {
         self.file.metadata().await
     }

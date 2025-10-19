@@ -13,6 +13,7 @@ use crate::handler::incoming_to_req::IncomingToInternal;
 use crate::handler::router::HttpSvc;
 use crate::{config::config::ApplicationConfig, handler::router::Router};
 
+/// 应用程序入口，负责持有配置与路由，并启动 HTTP 服务
 pub struct Application {
     config: ApplicationConfig,
     svc: HttpSvc<Req>,
@@ -20,6 +21,9 @@ pub struct Application {
 
 /// 应用程序
 impl Application {
+    /// 使用给定的配置与 Router 构建一个应用实例
+    ///
+    /// 一般情况下，你可以使用 [`Application::new_`] 读取默认配置后创建。
     pub fn new<S: Send + Sync + 'static>(
         config: ApplicationConfig,
         router: Router<S>,
@@ -30,13 +34,18 @@ impl Application {
         })
     }
 
+    /// 使用默认/合并后的配置与 Router 构建应用实例
+    ///
+    /// 该方法会读取项目根目录下的配置文件，失败时会回退到内置默认值。
     pub fn new_<S: Send + Sync + 'static>(router: Router<S>) -> Arc<Self> {
         Self::new(ApplicationConfig::load_().unwrap_or_default(), router)
     }
 }
 
 impl Application {
-    /// 运行一个应用程序，基于self.config和self.router开始监听
+    /// 运行应用，基于配置中的地址与端口监听并处理请求
+    ///
+    /// 此方法会阻塞当前异步任务，直到出现网络错误或手动终止。
     pub async fn run(self: Arc<Self>) -> IoResult<()> {
         let addr = format!("{}:{}", self.config.addr, self.config.port);
         let listener = TcpListener::bind(addr).await?;
@@ -52,6 +61,11 @@ impl Application {
             });
             tokio::spawn(async move {
                 if let Err(_e) = builder.serve_connection_with_upgrades(io, service).await {
+                    if let Some(hyper_err) = _e.downcast_ref::<hyper::Error>() {
+                        if hyper_err.is_incomplete_message() {
+                            return;
+                        }
+                    }
                     tracing::warn!("conn error {_e}");
                 };
             });

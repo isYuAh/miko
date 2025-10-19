@@ -15,9 +15,11 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use tower::Service;
 use tower::util::BoxCloneService;
+
 pub type RespBody = BoxBody<Bytes, Infallible>;
 pub type Resp = Response<RespBody>;
 pub type Req = Request<RespBody>;
+/// 通用处理器接口（由框架自动为函数实现）
 pub trait Handler: Send + Sync + 'static {
     fn call(&self, req: Req) -> Pin<Box<dyn Future<Output = Resp> + Send>>;
 }
@@ -47,6 +49,7 @@ macro_rules! impl_fn_once_tuple {
       }
   };
 }
+/// 用于以元组方式调用 FnOnce 的辅助 trait（支持多提取器参数的 handler）
 pub trait FnOnceTuple<Args> {
     type Output;
     fn call(self, args: Args) -> Self::Output;
@@ -97,12 +100,14 @@ macro_rules! impl_fn_once_tuple_all {
 
 impl_fn_once_tuple_all!();
 
+/// 框架内部用于绑定 handler 与提取器、状态的类型
 pub struct TypedHandler<F, A, S, M> {
     pub f: F,
     pub state: Arc<S>,
     _marker: PhantomData<(A, M)>,
 }
 impl<F, A, S, M> TypedHandler<F, A, S, M> {
+    /// 创建一个绑定了状态的 TypedHandler
     pub fn new(f: F, state: Arc<S>) -> Self {
         Self {
             f,
@@ -252,8 +257,10 @@ macro_rules! impl_from_request_tuple_all {
 
 impl_from_request_tuple_all!();
 
+/// 动态处理器对象
 pub type DynHandler = Arc<dyn Handler + Send + Sync>;
 
+/// 将一个 DynHandler 包装为 Tower Service 的小型适配器
 #[derive(Clone)]
 pub struct HandlerSvc {
     inner: DynHandler,
@@ -276,6 +283,7 @@ impl Service<Req> for HandlerSvc {
         Box::pin(async move { Ok(h.call(req).await) })
     }
 }
+/// 将 Handler 转换为可克隆的 Tower Service
 pub fn handler_to_svc(h: DynHandler) -> HttpSvc<Req> {
     let svc = HandlerSvc::new(h);
     BoxCloneService::new(svc)
