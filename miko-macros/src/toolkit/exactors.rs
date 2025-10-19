@@ -19,7 +19,7 @@ pub fn build_struct_from_query(
     }
     if fields.len() > 0 {
         let q_struct: ItemStruct = parse_quote! {
-            #[derive(::serde::Deserialize)]
+            #[derive(::miko::serde::Deserialize)]
             struct #struct_name {
                 #(#fields),*
             }

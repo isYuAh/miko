@@ -44,10 +44,10 @@ pub fn build_register_expr(ra: &RouteAttr, fn_name: &Ident) -> TokenStream {
     let mut stmts = Vec::new();
     for ref method in methods {
         let method_name = format_ident!("{}", method.as_str().to_uppercase());
-        stmts.push(quote! {router.route(::hyper::Method::#method_name, #path, #fn_name);});
+        stmts.push(quote! {router.route(::miko::hyper::Method::#method_name, #path, #fn_name);});
     }
     quote! {
-      inventory::submit! {
+      ::miko::inventory::submit! {
         ::miko::auto::RouteFlag {
           register: |mut router| {
             #(#stmts)*

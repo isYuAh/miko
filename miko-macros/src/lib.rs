@@ -48,7 +48,7 @@ pub fn miko(attr: TokenStream, item: TokenStream) -> TokenStream {
         quote! {}
     };
     quote! {
-        #[::tokio::main]
+        #[::miko::tokio::main]
         async fn main() {
             #set_panic_hook
             let mut _config = ::miko::config::config::ApplicationConfig::load_().unwrap_or_default();
