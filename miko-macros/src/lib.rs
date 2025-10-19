@@ -59,7 +59,7 @@ pub fn miko(attr: TokenStream, item: TokenStream) -> TokenStream {
 
             router.merge(::miko::auto::collect_global_router());
             let app = ::miko::application::Application::new(_config, router.take());
-            ::tokio::spawn(async {
+            ::miko::tokio::spawn(async {
                 ::miko::dep::CONTAINER.get().unwrap().read().await.prewarm_all().await;
             });
             app.run().await.unwrap();
@@ -122,7 +122,7 @@ pub fn component(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
     quote! {
         #input_struct
-        ::inventory::submit! {
+        ::miko::inventory::submit! {
             ::miko::dep::DependencyDefFn(|| {
                 ::miko::dep::DependencyDef {
                     type_id: std::any::TypeId::of::<#type_ident>(),
