@@ -1,19 +1,19 @@
+use crate::handler::extractor::extractors::Json;
+use crate::handler::handler::{Req, Resp};
+use crate::handler::ws::toolkit::upgrade_websocket;
 use anyhow::anyhow;
 use bytes::Bytes;
-use futures::{SinkExt, StreamExt};
 use futures::stream::{SplitSink, SplitStream};
-use hyper::upgrade::{Upgraded};
+use futures::{SinkExt, StreamExt};
+use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
 use serde::Serialize;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
 use tokio_tungstenite::WebSocketStream;
-use tungstenite::{Error, Message, Utf8Bytes};
 use tungstenite::protocol::{Role, WebSocketConfig};
-use crate::handler::extractor::extractors::Json;
-use crate::handler::handler::{Req, Resp};
-use crate::handler::ws::toolkit::upgrade_websocket;
+use tungstenite::{Error, Message, Utf8Bytes};
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub enum WsEvent {
@@ -29,9 +29,7 @@ pub struct WsSocket {
 }
 impl WsSocket {
     pub fn new(io: WebSocketStream<TokioIo<Upgraded>>) -> WsSocket {
-        Self {
-            io,
-        }
+        Self { io }
     }
     pub async fn send(&mut self, msg: impl IntoMessage) -> tungstenite::Result<()> {
         self.io.send(msg.into_message()).await
@@ -87,7 +85,9 @@ impl IntoMessage for String {
 }
 impl<T: Serialize> IntoMessage for Json<T> {
     fn into_message(self) -> Message {
-        Message::Text(Utf8Bytes::from(serde_json::to_string(&self.0).unwrap_or_default()))
+        Message::Text(Utf8Bytes::from(
+            serde_json::to_string(&self.0).unwrap_or_default(),
+        ))
     }
 }
 impl IntoMessage for Bytes {
@@ -106,21 +106,25 @@ impl IntoMessage for &[u8] {
     }
 }
 
-
-
-pub fn spawn_ws_event<F, Fut>(task: F, mut req: Req, options: Option<WebSocketConfig>) -> Result<Resp, anyhow::Error>
+pub fn spawn_ws_event<F, Fut>(
+    task: F,
+    req: &mut Req,
+    options: Option<WebSocketConfig>,
+) -> Result<Resp, anyhow::Error>
 where
     F: FnOnce(WsSocket) -> Fut + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
-    let Ok((resp, upgrade)) = upgrade_websocket(&mut req) else {
+    let Ok((resp, upgrade)) = upgrade_websocket(req) else {
         return Err(anyhow!("failed to upgrade websocket"));
     };
     tokio::spawn(async move {
         let upgraded = upgrade.await;
         match upgraded {
             Ok(upgraded) => {
-                let io = WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, options).await;
+                let io =
+                    WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, options)
+                        .await;
                 task(WsSocket::new(io)).await;
             }
             Err(_e) => {
@@ -134,7 +138,7 @@ pub type WsSendSink = SplitSink<WebSocketStream<TokioIo<Upgraded>>, Message>;
 pub type WsRecvStream = SplitStream<WebSocketStream<TokioIo<Upgraded>>>;
 #[derive(Clone)]
 pub struct WsSender {
-    inner: mpsc::Sender<Message>
+    inner: mpsc::Sender<Message>,
 }
 impl WsSender {
     pub fn new(inner: mpsc::Sender<Message>) -> Self {
@@ -142,11 +146,11 @@ impl WsSender {
     }
 }
 pub struct WsReceiver {
-    inner: WsRecvStream
+    inner: WsRecvStream,
 }
 impl WsReceiver {
     pub fn new(inner: WsRecvStream) -> Self {
-        Self { inner  }
+        Self { inner }
     }
 }
 impl WsSender {

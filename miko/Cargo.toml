@@ -37,8 +37,7 @@ tungstenite = "0.28.0"
 tokio-tungstenite = "0.28.0"
 
 [features]
-full = ["inner_log", "macro", "auto", "ext", "ws"]
-inner_log = []
+full = ["macro", "auto", "ext", "ws"]
 macro = ["miko-macros"]
 ws = []
 auto = ["macro", "miko-macros/auto", "inventory"]

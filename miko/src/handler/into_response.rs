@@ -67,7 +67,6 @@ where
 
 impl IntoResponse for anyhow::Error {
     fn into_response(self) -> Resp {
-        #[cfg(feature = "inner_log")]
         tracing::error!("{}", self);
         Response::builder()
             .status(500)

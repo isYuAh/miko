@@ -6,7 +6,6 @@ use hyper_util::{
 use std::sync::Arc;
 use tokio::io::Result as IoResult;
 use tokio::net::TcpListener;
-#[cfg(feature = "inner_log")]
 use tracing;
 
 use crate::handler::handler::Req;
@@ -43,7 +42,6 @@ impl Application {
         let listener = TcpListener::bind(addr).await?;
         let executor = TokioExecutor::new();
         let service = self.svc.clone();
-        #[cfg(feature = "inner_log")]
         tracing::info!("listening on {}:{}", self.config.addr, self.config.port);
         loop {
             let builder = AutoBuilder::new(executor.clone());
@@ -54,7 +52,6 @@ impl Application {
             });
             tokio::spawn(async move {
                 if let Err(_e) = builder.serve_connection_with_upgrades(io, service).await {
-                    #[cfg(feature = "inner_log")]
                     tracing::warn!("conn error {_e}");
                 };
             });
