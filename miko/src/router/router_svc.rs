@@ -1,5 +1,5 @@
 use crate::handler::handler::{Req, Resp};
-use crate::handler::router::Router;
+use crate::router::router::Router;
 use miko_core::fast_builder::ResponseBuilder;
 use std::convert::Infallible;
 use std::{

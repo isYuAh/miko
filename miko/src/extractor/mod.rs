@@ -1,9 +1,6 @@
-use crate::handler::extractor::from_request::FRPFut;
-use crate::handler::extractor::path_params::PathParams;
-use crate::handler::{
-    extractor::from_request::{FRFut, FromRequest, FromRequestParts},
-    handler::Req,
-};
+use crate::extractor::from_request::FRPFut;
+use crate::extractor::path_params::PathParams;
+use crate::handler::handler::Req;
 use anyhow::anyhow;
 use bytes::Bytes;
 use http_body_util::BodyExt;
@@ -14,6 +11,7 @@ use miko_core::fast_builder::boxed_err;
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 use std::sync::Arc;
+use crate::extractor::from_request::{FRFut, FromRequest, FromRequestParts};
 
 /// JSON 请求体提取器，将请求体反序列化为 T
 #[derive(Debug)]
