@@ -1,3 +1,4 @@
+#![cfg(feature = "auto")]
 use crate::toolkit::rout_arg::is_arc;
 use proc_macro2::Ident;
 use proc_macro2::TokenStream;

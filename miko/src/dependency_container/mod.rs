@@ -2,7 +2,9 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
-use tokio::sync::{OnceCell, RwLock, RwLockReadGuard};
+use tokio::sync::OnceCell;
+#[cfg(feature = "auto")]
+use tokio::sync::{RwLock, RwLockReadGuard};
 
 #[cfg(feature = "auto")]
 pub static CONTAINER: OnceCell<Arc<RwLock<LazyDependencyContainer>>> = OnceCell::const_new();

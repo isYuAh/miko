@@ -14,6 +14,7 @@ use hyper::{Method, Request, body::Incoming};
 use matchit::Router as MRouter;
 use miko_core::{IntoMethods, encode_route};
 use nested::NestLayer;
+#[cfg(feature = "ext")]
 use std::path::PathBuf;
 use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use tower::{Layer, Service, util::BoxCloneService};

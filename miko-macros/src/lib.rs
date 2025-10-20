@@ -1,10 +1,11 @@
 use crate::route::RouteAttr;
 use crate::route::core::route_handler;
 use crate::toolkit::attr::StrAttrMap;
+#[cfg(feature = "auto")]
 use crate::toolkit::impl_operation::{get_constructor, inject_deps};
 use proc_macro::TokenStream;
-use quote::{format_ident, quote};
-use syn::{ItemFn, ItemImpl, TypePath, parse_macro_input};
+use quote::quote;
+use syn::{ItemFn, parse_macro_input};
 
 mod extractor;
 mod route;
@@ -147,6 +148,8 @@ derive_route_macro!(connect, CONNECT);
 /// ```
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, input: TokenStream) -> TokenStream {
+    use quote::format_ident;
+    use syn::{ItemImpl, TypePath};
     let args = syn::parse_macro_input!(attr as StrAttrMap);
     let input_struct = parse_macro_input!(input as ItemImpl);
     let prewarm = args.get("prewarm").is_some();
