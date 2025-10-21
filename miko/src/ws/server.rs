@@ -52,7 +52,7 @@ impl WsSocket {
                             break;
                         }
                         _ => {
-                            eprintln!("websocket send error: {:?}", e);
+                            tracing::warn!(error = ?e, "WebSocket send error");
                         }
                     }
                     break;

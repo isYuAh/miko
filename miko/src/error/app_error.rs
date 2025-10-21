@@ -316,6 +316,16 @@ impl IntoResponse for AppError {
         let message = self.message();
         let details = self.details();
 
+        // 记录服务器内部错误（5xx）
+        if status.is_server_error() {
+            tracing::error!(
+                error_code = %error_code,
+                message = %message,
+                trace_id = ?get_trace_id(),
+                "Internal server error"
+            );
+        }
+
         let error_response = ErrorResponse {
             status: status.as_u16(),
             error: error_code,
