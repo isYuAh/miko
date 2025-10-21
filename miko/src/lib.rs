@@ -9,6 +9,7 @@ pub use miko_macros::*;
 #[cfg(feature = "auto")]
 pub mod auto;
 pub mod dependency_container;
+pub mod error;
 pub mod extractor;
 pub mod http;
 pub mod router;
@@ -27,3 +28,6 @@ pub use utoipa::{self, IntoParams, OpenApi, ToResponse, ToSchema};
 
 // 导出常用的响应类型
 pub use http::response::into_response::IntoResponse;
+
+// 导出错误处理类型
+pub use error::{AppError, AppResult, ErrorResponse, ValidationErrorDetail};

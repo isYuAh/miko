@@ -2,17 +2,22 @@ pub mod from_request;
 pub mod multipart;
 pub mod path_params;
 
+#[cfg(feature = "validation")]
+pub mod validated_json;
+
+#[cfg(feature = "validation")]
+pub use validated_json::ValidatedJson;
+
+use crate::error::AppError;
 use crate::extractor::from_request::FRPFut;
 use crate::extractor::from_request::{FRFut, FromRequest, FromRequestParts};
 use crate::extractor::path_params::PathParams;
 use crate::handler::handler::Req;
-use anyhow::anyhow;
 use bytes::Bytes;
 use http_body_util::BodyExt;
 use hyper::http::Extensions;
 use hyper::http::request::Parts;
 use hyper::{Method, Uri};
-use miko_core::fast_builder::boxed_err;
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -36,12 +41,18 @@ where
     fn from_request(mut req: Req, _state: Arc<S>) -> FRFut<Self> {
         let _ = _state;
         Box::pin(async move {
-            let body = req.body_mut().collect().await.unwrap().to_bytes();
-            let json = serde_json::from_slice(&body);
-            match json {
-                Ok(json) => Ok(Json(json)),
-                Err(err) => Err(err.into()),
-            }
+            let body = req
+                .body_mut()
+                .collect()
+                .await
+                .map_err(|e| AppError::BadRequest(format!("Failed to read request body: {}", e)))?
+                .to_bytes();
+
+            // 直接使用 JsonParseError，包含原始的 serde_json::Error
+            let json =
+                serde_json::from_slice::<T>(&body).map_err(|e| AppError::JsonParseError(e))?;
+
+            Ok(Json(json))
         })
     }
 }
@@ -54,10 +65,9 @@ where
         let query = req.uri.query().unwrap_or("");
         let query = serde_urlencoded::from_str(query);
         Box::pin(async move {
-            match query {
-                Ok(query) => Ok(Query(query)),
-                Err(err) => Err(err.into()),
-            }
+            query
+                .map(Query)
+                .map_err(|e| AppError::UrlEncodedParseError(e))
         })
     }
 }
@@ -70,13 +80,18 @@ where
     fn from_request_parts(req: &mut Parts, _state: Arc<S>) -> FRFut<Self> {
         let pp = req.extensions.get_mut::<PathParams>().unwrap();
         if pp.0.len() < 1 {
-            return boxed_err(anyhow!("path params not long enough"));
+            return Box::pin(async move {
+                Err(AppError::BadRequest("No path parameters found".to_string()))
+            });
         }
         let path = pp.0.remove(0).1.clone();
         Box::pin(async move {
             match path.parse::<T>() {
                 Ok(value) => Ok(Path(value)),
-                Err(err) => Err(anyhow!("Failed to parse path parameter: {}", err)),
+                Err(err) => Err(AppError::BadRequest(format!(
+                    "Failed to parse path parameter '{}': {}",
+                    path, err
+                ))),
             }
         })
     }
@@ -91,10 +106,17 @@ impl<S: Send + Sync + 'static> FromRequestParts<S> for State<S> {
 impl<S> FromRequest<S> for String {
     fn from_request(mut req: Req, _state: Arc<S>) -> FRFut<Self> {
         Box::pin(async move {
-            let body = req.body_mut().collect().await.unwrap().to_bytes();
+            let body = req
+                .body_mut()
+                .collect()
+                .await
+                .map_err(|e| AppError::BadRequest(format!("Failed to read request body: {}", e)))?
+                .to_bytes();
             let string = std::str::from_utf8(&body)
                 .map(|s| s.to_string())
-                .map_err(|e| anyhow::anyhow!("Invalid UTF-8: {}", e))?;
+                .map_err(|e| {
+                    AppError::BadRequest(format!("Invalid UTF-8 in request body: {}", e))
+                })?;
             Ok(string)
         })
     }
@@ -103,7 +125,12 @@ impl<S> FromRequest<S> for String {
 impl<S> FromRequest<S> for Bytes {
     fn from_request(mut req: Req, _state: Arc<S>) -> FRFut<Self> {
         Box::pin(async move {
-            let body = req.body_mut().collect().await.unwrap().to_bytes();
+            let body = req
+                .body_mut()
+                .collect()
+                .await
+                .map_err(|e| AppError::BadRequest(format!("Failed to read request body: {}", e)))?
+                .to_bytes();
             Ok(body)
         })
     }
@@ -115,8 +142,14 @@ where
 {
     fn from_request(mut req: Req, _state: Arc<S>) -> FRFut<Self> {
         Box::pin(async move {
-            let body = req.body_mut().collect().await?;
-            let form: T = serde_urlencoded::from_bytes(&*body.to_bytes())?;
+            let body = req
+                .body_mut()
+                .collect()
+                .await
+                .map_err(|e| AppError::BadRequest(format!("Failed to read request body: {}", e)))?
+                .to_bytes();
+            let form: T = serde_urlencoded::from_bytes(&body)
+                .map_err(|e| AppError::UrlEncodedParseError(e))?;
             Ok(Form(form))
         })
     }

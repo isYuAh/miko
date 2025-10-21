@@ -42,13 +42,13 @@ impl<T: Serialize> IntoResponse for Json<T> {
 }
 
 /// HTML 响应包装器
-/// 
+///
 /// 用于返回 HTML 内容，自动设置 content-type 为 text/html
-/// 
+///
 /// # Example
 /// ```no_run
 /// use miko::http::response::into_response::{IntoResponse, Html};
-/// 
+///
 /// async fn handler() -> impl IntoResponse {
 ///     Html("<h1>Hello World</h1>".to_string())
 /// }
@@ -96,15 +96,9 @@ where
 
 impl IntoResponse for anyhow::Error {
     fn into_response(self) -> Resp {
-        tracing::error!("{}", self);
-        Response::builder()
-            .status(500)
-            .header("content-type", "text/plain;charset=utf-8")
-            .body(bytes_to_boxed(Bytes::from(format!(
-                "Internal Server Error: {}",
-                self
-            ))))
-            .expect("error when create error response")
+        use crate::error::AppError;
+        let app_error: AppError = self.into();
+        app_error.into_response()
     }
 }
 

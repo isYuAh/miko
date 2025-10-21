@@ -1,4 +1,4 @@
-use anyhow::Error;
+use crate::error::AppError;
 use hyper::HeaderMap;
 use hyper::http::request::Parts;
 use std::sync::Arc;
@@ -7,9 +7,9 @@ use crate::handler::handler::Req;
 use crate::handler::handler::{PartsTag, ReqTag};
 
 /// FromRequest 返回值的异步类型别名（拥有请求体）
-pub type FRFut<T> = std::pin::Pin<Box<dyn Future<Output = Result<T, Error>> + Send + 'static>>;
+pub type FRFut<T> = std::pin::Pin<Box<dyn Future<Output = Result<T, AppError>> + Send + 'static>>;
 /// FromRequestParts 返回值的异步类型别名（仅解析请求头与路径等）
-pub type FRPFut<'a, T> = std::pin::Pin<Box<dyn Future<Output = Result<T, Error>> + Send + 'a>>;
+pub type FRPFut<'a, T> = std::pin::Pin<Box<dyn Future<Output = Result<T, AppError>> + Send + 'a>>;
 
 /// 基于完整 Request 的提取器
 ///
@@ -90,7 +90,7 @@ where
     }
 }
 
-impl<S, T> FromRequest<S> for Result<T, Error>
+impl<S, T> FromRequest<S> for Result<T, AppError>
 where
     S: Send + Sync + 'static,
     T: FromRequest<S> + Send + 'static,
@@ -105,7 +105,7 @@ where
     }
 }
 
-impl<S, T> FromRequestParts<S> for Result<T, Error>
+impl<S, T> FromRequestParts<S> for Result<T, AppError>
 where
     S: Send + Sync + 'static,
     T: FromRequestParts<S> + Send + 'static,

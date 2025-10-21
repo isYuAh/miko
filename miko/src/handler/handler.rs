@@ -133,7 +133,7 @@ where
                     let resp = f.call(args).await;
                     resp.into_response()
                 }
-                Err(err) => err.into_response(),
+                Err(app_error) => app_error.into_response(),
             }
         })
     }

@@ -36,17 +36,23 @@ tokio-stream = "0.1.17"
 tungstenite = "0.28.0"
 tokio-tungstenite = "0.28.0"
 utoipa = { version = "5", optional = true }
+garde = { version = "0.20", optional = true, features = ["derive"] }
 
 [features]
-full = ["macro", "auto", "ext", "ws", "utoipa"]
+full = ["macro", "auto", "ext", "ws", "utoipa", "validation"]
 macro = ["miko-macros"]
 ws = []
 auto = ["macro", "miko-macros/auto", "inventory"]
 ext = ["tower-http", "httpdate"]
 utoipa = ["miko-macros/utoipa", "dep:utoipa"]
+validation = ["garde"]
 
 [[example]]
 name = "demo"
+required-features = ["full"]
+
+[[example]]
+name = "error_handling"
 required-features = ["full"]
 
 [[example]]
@@ -57,7 +63,12 @@ required-features = ["full"]
 name = "utoipa_test"
 required-features = ["full"]
 
+[[example]]
+name = "validation_test"
+required-features = ["full"]
+
 [dev-dependencies]
 utoipa = { version = "5", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.2", features = ["axum"] }
 tracing-subscriber = "0.3.20"
+garde = { version = "0.20", features = ["derive"] }
