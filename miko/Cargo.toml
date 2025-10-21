@@ -35,17 +35,29 @@ tempfile = "3.23.0"
 tokio-stream = "0.1.17"
 tungstenite = "0.28.0"
 tokio-tungstenite = "0.28.0"
+utoipa = { version = "5", optional = true }
 
 [features]
-full = ["macro", "auto", "ext", "ws"]
+full = ["macro", "auto", "ext", "ws", "utoipa"]
 macro = ["miko-macros"]
 ws = []
 auto = ["macro", "miko-macros/auto", "inventory"]
 ext = ["tower-http", "httpdate"]
+utoipa = ["miko-macros/utoipa", "dep:utoipa"]
 
 [[example]]
 name = "demo"
 required-features = ["full"]
 
+[[example]]
+name = "utoipa_demo"
+required-features = ["full"]
+
+[[example]]
+name = "utoipa_test"
+required-features = ["full"]
+
 [dev-dependencies]
+utoipa = { version = "5", features = ["axum_extras"] }
+utoipa-scalar = { version = "0.2", features = ["axum"] }
 tracing-subscriber = "0.3.20"

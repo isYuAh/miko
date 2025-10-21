@@ -10,6 +10,13 @@ use proc_macro2::{Ident, Span};
 use quote::quote;
 use syn::{ItemFn, Stmt, parse_quote};
 
+#[cfg(feature = "utoipa")]
+use crate::utoipa::{
+    attributes::parse_utoipa_attrs,
+    generator::{HttpMethod, generate_utoipa_path_attr},
+    infer::infer_openapi_config,
+};
+
 /// 处理 `#[route(...)]` 系列宏的核心处理器。
 ///
 /// 主要职责：
@@ -19,6 +26,15 @@ use syn::{ItemFn, Stmt, parse_quote};
 /// - 将用户函数体和自动生成的注入语句合并为最终的宏展开。
 pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
     let fn_name = fn_item.sig.ident.clone();
+
+    // utoipa: 在处理前保存原始签名和属性用于推断
+    #[cfg(feature = "utoipa")]
+    let original_attrs = fn_item.attrs.clone();
+    #[cfg(feature = "utoipa")]
+    let original_inputs = fn_item.sig.inputs.clone();
+    #[cfg(feature = "utoipa")]
+    let original_output = fn_item.sig.output.clone();
+
     // 自动返回值
     let sig = &mut fn_item.sig;
     if matches!(sig.output, syn::ReturnType::Default) {
@@ -81,18 +97,167 @@ pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
     } else {
         None
     };
+
+    // utoipa: 生成 OpenAPI 文档
+    #[cfg(feature = "utoipa")]
+    let utoipa_attr =
+        generate_utoipa_attr(&args, &original_attrs, &original_inputs, &original_output);
+
+    #[cfg(feature = "utoipa")]
+    {
+        quote! {
+          #q_struct
+
+          #utoipa_attr
+          #sig {
+            #(#inject_segs)*
+            #(#dep_stmts)*
+            #(#config_value_stmts)*
+            #(#user_stmts)*
+          }
+
+          #inventory_collect
+
+        }
+        .into()
+    }
+
+    #[cfg(not(feature = "utoipa"))]
+    {
+        quote! {
+          #q_struct
+
+          #sig {
+            #(#inject_segs)*
+            #(#dep_stmts)*
+            #(#config_value_stmts)*
+            #(#user_stmts)*
+          }
+
+          #inventory_collect
+
+        }
+        .into()
+    }
+}
+
+/// route_handler 的变体: 只生成 OpenAPI,不注册路由
+/// 用于 #[miko::path] 宏
+#[cfg(feature = "utoipa")]
+pub fn route_handler_no_register(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
+    let fn_name = fn_item.sig.ident.clone();
+
+    // 保存原始签名用于 OpenAPI 推断
+    let original_attrs = fn_item.attrs.clone();
+    let original_inputs = fn_item.sig.inputs.clone();
+    let original_output = fn_item.sig.output.clone();
+
+    // 自动返回值
+    let sig = &mut fn_item.sig;
+    if matches!(sig.output, syn::ReturnType::Default) {
+        (*sig).output = parse_quote!(-> impl ::miko::http::response::into_response::IntoResponse)
+    }
+    let inject_segs: Vec<Stmt> = Vec::new();
+    let rfa = RouteFnArg::from_punctuated(&mut sig.inputs);
+    //处理路由
+    let path_inputs = rfa.gen_fn_args(deal_with_path_attr);
+    //处理body
+    let body_inputs = rfa.gen_fn_args(deal_with_body_attr);
+    let plain_inputs = rfa.gen_fn_args(|rfa| {
+        if rfa.mark.is_empty() {
+            FnArgResult::Keep
+        } else {
+            FnArgResult::Remove
+        }
+    });
+    //处理dep
+    let mut dep_stmts = Vec::new();
+    build_dep_injector(&rfa, &mut dep_stmts);
+    #[cfg(feature = "auto")]
+    let dep_stmts = if dep_stmts.is_empty() {
+        dep_stmts
+    } else {
+        dep_stmts.insert(
+            0,
+            quote! {
+                let __dep_container = ::miko::dependency_container::get_global_dc().await;
+            },
+        );
+        dep_stmts
+    };
+    // 处理config_value
+    let mut config_value_stmts = Vec::new();
+    build_config_value_injector(&rfa, &mut config_value_stmts);
+    // 清空参数
+    sig.inputs.clear();
+    // 获取无修饰参数
+    // 组装path
+    sig.inputs.extend(path_inputs);
+    // 构建 Query 结构体和解构提取器
+    let q_struct_ident = Ident::new(
+        &format!("__{}_QueryStruct", fn_name.to_string()),
+        Span::call_site(),
+    );
+    // 重组Query
+    let (q_struct, q_struct_exactor) = build_struct_from_query(&rfa, q_struct_ident);
+    if q_struct.is_some() {
+        sig.inputs.push(q_struct_exactor.unwrap());
+    }
+    // 组装plain_inputs
+    sig.inputs.extend(plain_inputs);
+    // 最后组装body
+    sig.inputs.extend(body_inputs);
+    // 展开
+    let user_stmts = &fn_item.block.stmts.clone();
+
+    // 生成 OpenAPI 文档 (不生成 inventory 注册)
+    let utoipa_attr =
+        generate_utoipa_attr(&args, &original_attrs, &original_inputs, &original_output);
+
     quote! {
       #q_struct
 
+      #utoipa_attr
       #sig {
         #(#inject_segs)*
         #(#dep_stmts)*
         #(#config_value_stmts)*
         #(#user_stmts)*
       }
-
-      #inventory_collect
-
     }
     .into()
+}
+
+#[cfg(feature = "utoipa")]
+fn generate_utoipa_attr(
+    args: &RouteAttr,
+    original_attrs: &[syn::Attribute],
+    original_inputs: &syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>,
+    original_output: &syn::ReturnType,
+) -> proc_macro2::TokenStream {
+    // 1. 解析用户配置
+    let mut user_config = parse_utoipa_attrs(original_attrs);
+
+    // 2. 自动推断
+    let inferred = infer_openapi_config(original_attrs, original_inputs, original_output);
+
+    // 3. 合并配置
+    user_config.auto_summary = inferred.auto_summary;
+    user_config.auto_description = inferred.auto_description;
+    user_config.auto_params = inferred.auto_params;
+    user_config.auto_response = inferred.auto_response;
+
+    // 4. 确定 HTTP 方法
+    let method = if let Some(ref methods) = args.method {
+        if let Some(first_method) = methods.first() {
+            HttpMethod::from_hyper_method(first_method)
+        } else {
+            HttpMethod::Get
+        }
+    } else {
+        HttpMethod::Get
+    };
+
+    // 5. 生成 utoipa::path 宏
+    generate_utoipa_path_attr(&method, &args.path, &user_config)
 }

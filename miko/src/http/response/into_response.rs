@@ -41,6 +41,29 @@ impl<T: Serialize> IntoResponse for Json<T> {
     }
 }
 
+/// HTML 响应包装器
+/// 
+/// 用于返回 HTML 内容，自动设置 content-type 为 text/html
+/// 
+/// # Example
+/// ```no_run
+/// use miko::http::response::into_response::{IntoResponse, Html};
+/// 
+/// async fn handler() -> impl IntoResponse {
+///     Html("<h1>Hello World</h1>".to_string())
+/// }
+/// ```
+pub struct Html(pub String);
+
+impl IntoResponse for Html {
+    fn into_response(self) -> Resp {
+        Response::builder()
+            .header("content-type", "text/html; charset=utf-8")
+            .body(bytes_to_boxed(Bytes::from(self.0)))
+            .unwrap()
+    }
+}
+
 impl IntoResponse for Resp {
     fn into_response(self) -> Resp {
         self

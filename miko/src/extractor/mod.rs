@@ -64,7 +64,8 @@ where
 
 impl<S, T> FromRequestParts<S> for Path<T>
 where
-    T: From<String> + Send + Sync + 'static,
+    T: std::str::FromStr + Send + Sync + 'static,
+    T::Err: std::fmt::Display,
 {
     fn from_request_parts(req: &mut Parts, _state: Arc<S>) -> FRFut<Self> {
         let pp = req.extensions.get_mut::<PathParams>().unwrap();
@@ -72,7 +73,12 @@ where
             return boxed_err(anyhow!("path params not long enough"));
         }
         let path = pp.0.remove(0).1.clone();
-        Box::pin(async move { Ok(Path(path.into())) })
+        Box::pin(async move {
+            match path.parse::<T>() {
+                Ok(value) => Ok(Path(value)),
+                Err(err) => Err(anyhow!("Failed to parse path parameter: {}", err)),
+            }
+        })
     }
 }
 

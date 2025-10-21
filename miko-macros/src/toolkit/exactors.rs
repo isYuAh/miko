@@ -20,12 +20,30 @@ pub fn build_struct_from_query(
             let name = &rfa.ident;
             let ty = rfa.ty.clone();
             idents.push(name.clone());
-            fields.push(quote! {pub #name: #ty})
+
+            // 提取参数上的 #[desc] 注释
+            let desc_attr = extract_desc_attr(&rfa.attrs);
+
+            fields.push(quote! {
+                #desc_attr
+                pub #name: #ty
+            })
         }
     }
     if fields.len() > 0 {
-        let q_struct: ItemStruct = parse_quote! {
+        // 根据是否启用 utoipa feature 决定是否派生 IntoParams
+        #[cfg(feature = "utoipa")]
+        let derives = quote! {
+            #[derive(::miko::serde::Deserialize, ::utoipa::IntoParams)]
+        };
+
+        #[cfg(not(feature = "utoipa"))]
+        let derives = quote! {
             #[derive(::miko::serde::Deserialize)]
+        };
+
+        let q_struct: ItemStruct = parse_quote! {
+            #derives
             struct #struct_name {
                 #(#fields),*
             }
@@ -37,4 +55,25 @@ pub fn build_struct_from_query(
     } else {
         (None, None)
     }
+}
+
+/// 从属性中提取 #[desc("...")] 并转换为 utoipa 的 #[schema(description = "...")]
+fn extract_desc_attr(attrs: &[syn::Attribute]) -> proc_macro2::TokenStream {
+    #[cfg(feature = "utoipa")]
+    {
+        for attr in attrs {
+            if attr.path().is_ident("desc") {
+                if let Ok(lit) = attr.parse_args::<syn::LitStr>() {
+                    return quote! {
+                        #[schema(description = #lit)]
+                    };
+                }
+            }
+        }
+    }
+
+    #[cfg(not(feature = "utoipa"))]
+    let _ = attrs; // 避免未使用参数警告
+
+    quote! {}
 }

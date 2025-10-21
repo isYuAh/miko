@@ -11,6 +11,9 @@ mod extractor;
 mod route;
 mod toolkit;
 
+#[cfg(feature = "utoipa")]
+mod utoipa;
+
 /// 标准路由属性宏（用于自定义路由）
 ///
 /// 用法：在处理请求的函数上使用 `#[route(...)]` 或派生宏如 `#[get(...)]`。
@@ -22,6 +25,7 @@ mod toolkit;
 /// - `#[body]`：从请求体反序列化（默认 JSON；标记 `str` 可保留为 String）；
 /// - `#[dep]`：注入全局依赖（参数类型通常为 `Arc<T>`，需先注册该组件）；
 /// - `#[config("key")]`/`#[config(path = "key")]`：从应用配置读取并解析为参数类型。
+/// - `#[desc("描述")]`：为参数添加描述（启用 utoipa 时会生成 OpenAPI 文档）；
 ///
 /// 注意：
 /// - 仅当同时启用 `auto` feature 且应用通过 `#[miko]` 启动时，框架才会自动收集并注册由这些宏生成的路由；
@@ -32,7 +36,9 @@ mod toolkit;
 /// 示例：
 /// ```rust
 /// #[get("/hello/{id}")]
-/// async fn hello(#[path] id: i32) -> impl miko::http::response::into_response::IntoResponse {
+/// async fn hello(
+///     #[path] #[desc("用户ID")] id: i32
+/// ) -> impl miko::http::response::into_response::IntoResponse {
 ///     // 处理请求
 /// }
 /// ```
@@ -189,4 +195,196 @@ pub fn component(attr: TokenStream, input: TokenStream) -> TokenStream {
             })
         }
     }.into()
+}
+
+// ==================== Utoipa 辅助宏 ====================
+
+#[cfg(feature = "utoipa")]
+/// 标记响应信息
+///
+/// 用法：
+/// ```rust
+/// #[u_response(status = 404, description = "用户不存在", body = ErrorResponse)]
+/// ```
+#[proc_macro_attribute]
+pub fn u_response(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    // 这个宏不做任何转换，只是作为标记供 route 宏读取
+    item
+}
+
+#[cfg(feature = "utoipa")]
+/// 标记 API 标签
+///
+/// 用法：
+/// ```rust
+/// #[u_tag("用户管理")]
+/// ```
+#[proc_macro_attribute]
+pub fn u_tag(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[cfg(feature = "utoipa")]
+/// 标记 API 摘要
+///
+/// 用法：
+/// ```rust
+/// #[u_summary("获取用户信息")]
+/// ```
+#[proc_macro_attribute]
+pub fn u_summary(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[cfg(feature = "utoipa")]
+/// 标记 API 详细描述
+///
+/// 用法：
+/// ```rust
+/// #[u_description("根据用户 ID 获取详细信息")]
+/// ```
+#[proc_macro_attribute]
+pub fn u_description(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[cfg(feature = "utoipa")]
+/// 标记参数补充信息
+///
+/// 用法：
+/// ```rust
+/// #[u_param(name = "id", description = "用户ID", example = 123)]
+/// ```
+#[proc_macro_attribute]
+pub fn u_param(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[cfg(feature = "utoipa")]
+/// 标记 API 已弃用
+///
+/// 用法：
+/// ```rust
+/// #[u_deprecated]
+/// ```
+#[proc_macro_attribute]
+pub fn u_deprecated(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+/// 为参数添加描述
+///
+/// 用于给函数参数添加描述信息，在启用 utoipa feature 时会生成到 OpenAPI 文档中。
+///
+/// 用法:
+/// ```rust
+/// #[get("/users/{id}")]
+/// async fn get_user(
+///     #[path] #[desc("用户ID")] id: i32,
+///     #[query] #[desc("页码")] page: Option<i32>
+/// ) -> impl IntoResponse {
+///     // ...
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn desc(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    // 这个宏不做任何转换，只是作为标记供其他宏读取
+    item
+}
+
+/// 标记路径参数
+///
+/// 用于标记从 URL 路径中提取的参数。
+///
+/// 用法:
+/// ```rust
+/// #[get("/users/:id")]
+/// async fn get_user(#[path] id: i32) -> impl IntoResponse {
+///     // ...
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn path(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    // 这个宏不做任何转换，只是作为标记供 route 宏读取
+    item
+}
+
+/// 标记查询参数
+///
+/// 用于标记从 URL 查询字符串中提取的参数。
+///
+/// 用法:
+/// ```rust
+/// #[get("/users")]
+/// async fn list_users(
+///     #[query] page: Option<i32>,
+///     #[query] page_size: Option<i32>
+/// ) -> impl IntoResponse {
+///     // ...
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn query(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    // 这个宏不做任何转换，只是作为标记供 route 宏读取
+    item
+}
+
+/// 标记请求体参数
+///
+/// 用于标记从请求体中提取的参数。
+///
+/// 用法:
+/// ```rust
+/// #[post("/users")]
+/// async fn create_user(#[body] user: User) -> impl IntoResponse {
+///     // ...
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn body(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    // 这个宏不做任何转换，只是作为标记供 route 宏读取
+    item
+}
+
+#[cfg(feature = "utoipa")]
+/// 仅生成 OpenAPI 文档，不自动注册路由
+///
+/// 用于手动注册路由的场景。该宏生成 utoipa::path 属性，但不会通过 inventory 自动注册路由。
+/// 你需要手动将这个函数注册到 Router 中。
+///
+/// 与 `#[get]`, `#[post]` 等宏的区别：
+/// - `#[get]` 等宏: 自动注册路由 + 生成 OpenAPI (需要 auto feature)
+/// - `#[miko_path]`: 只生成 OpenAPI，需要手动注册路由
+///
+/// 用法:
+/// ```rust
+/// // 1. 使用 miko_path 宏生成 OpenAPI
+/// #[miko::miko_path(path = "/manual")]
+/// #[u_tag("Manual")]
+/// #[u_response(status = 200, body = User)]
+/// async fn manual_handler() -> Json<User> {
+///     // ...
+/// }
+///
+/// // 2. 手动注册路由
+/// let router = Router::new()
+///     .get("/manual", manual_handler);
+///
+/// // 3. OpenApi 定义中可以引用
+/// #[derive(miko::OpenApi)]
+/// #[openapi(
+///     paths(manual_handler),  // 仍然可以在这里引用
+/// )]
+/// struct ApiDoc;
+/// ```
+#[proc_macro_attribute]
+pub fn miko_path(attr: TokenStream, item: TokenStream) -> TokenStream {
+    // 解析 HTTP 方法和路径
+    // 格式: #[miko_path(path = "/xxx")] 或 #[miko_path(path = "/xxx", ...)]
+    let args = parse_macro_input!(attr as RouteAttr);
+    let fn_item = parse_macro_input!(item as ItemFn);
+
+    // 为了简化，我们生成一个不带 inventory 的版本
+    use crate::route::core::route_handler_no_register;
+    route_handler_no_register(args, fn_item)
 }
