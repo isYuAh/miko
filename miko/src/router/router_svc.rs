@@ -54,26 +54,27 @@ impl<S: Send + Sync + 'static> Service<Req> for RouterSvc<S> {
             Some((mut handler, params)) => Box::pin(async move {
                 req.extensions_mut().insert(params);
                 let resp = handler.call(req).await;
-                
+
                 // 记录请求完成
                 let elapsed = start.elapsed();
+                let Ok(ref response) = resp;
                 tracing::debug!(
                     method = %method,
                     path = %path,
                     trace_id = %trace_id,
-                    status = %resp.status(),
+                    status = %response.status(),
                     elapsed_ms = elapsed.as_millis(),
                     "Request completed"
                 );
-                
+
                 // 请求处理完成,清理 trace_id
                 clear_trace_id();
                 resp
             }),
             None => Box::pin(async move {
                 let resp = ResponseBuilder::not_found();
-                
-                // 记录请求完成（404）
+
+                // 记录请求完成(404)
                 let elapsed = start.elapsed();
                 tracing::debug!(
                     method = %method,
@@ -83,7 +84,7 @@ impl<S: Send + Sync + 'static> Service<Req> for RouterSvc<S> {
                     elapsed_ms = elapsed.as_millis(),
                     "Request completed"
                 );
-                
+
                 // 清理 trace_id
                 clear_trace_id();
                 resp
