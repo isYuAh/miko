@@ -5,11 +5,15 @@ use syn::*;
 /// 从函数属性中提取文档注释
 pub fn extract_doc_comments(attrs: &[Attribute]) -> (Option<String>, Option<String>) {
     let mut lines = Vec::new();
-    
+
     for attr in attrs {
         if attr.path().is_ident("doc") {
             if let Ok(meta) = attr.meta.require_name_value() {
-                if let Expr::Lit(ExprLit { lit: Lit::Str(lit_str), .. }) = &meta.value {
+                if let Expr::Lit(ExprLit {
+                    lit: Lit::Str(lit_str),
+                    ..
+                }) = &meta.value
+                {
                     let line = lit_str.value().trim().to_string();
                     if !line.is_empty() {
                         lines.push(line);
@@ -18,21 +22,21 @@ pub fn extract_doc_comments(attrs: &[Attribute]) -> (Option<String>, Option<Stri
             }
         }
     }
-    
+
     if lines.is_empty() {
         return (None, None);
     }
-    
+
     // 第一行作为 summary
     let summary = lines.first().cloned();
-    
+
     // 其余行作为 description
     let description = if lines.len() > 1 {
         Some(lines[1..].join("\n"))
     } else {
         None
     };
-    
+
     (summary, description)
 }
 
@@ -41,11 +45,15 @@ pub fn extract_doc_comments(attrs: &[Attribute]) -> (Option<String>, Option<Stri
 /// 支持：
 /// 1. #[path], #[query], #[header] 标记
 /// 2. Miko 提取器：Path<T>, Query<T>, Json<T>, Form<T>
-pub fn infer_params_from_fn_args(inputs: &punctuated::Punctuated<FnArg, token::Comma>) 
-    -> (Vec<ParamConfig>, Option<crate::utoipa::config::RequestBodyConfig>) {
+pub fn infer_params_from_fn_args(
+    inputs: &punctuated::Punctuated<FnArg, token::Comma>,
+) -> (
+    Vec<ParamConfig>,
+    Option<crate::utoipa::config::RequestBodyConfig>,
+) {
     let mut params = Vec::new();
     let mut request_body = None;
-    
+
     for arg in inputs {
         if let FnArg::Typed(pat_type) = arg {
             // 检查是否是 #[body]
@@ -53,62 +61,80 @@ pub fn infer_params_from_fn_args(inputs: &punctuated::Punctuated<FnArg, token::C
                 // 提取类型
                 let ty = (*pat_type.ty).clone();
                 let description = extract_desc_from_attrs(&pat_type.attrs);
-                
+                let mut content_type = "application/json".to_string();
+                use crate::toolkit::attr::StrAttrMap;
+                for attr in &pat_type.attrs {
+                    if attr.path.is_ident("body") {
+                        if let Meta::List(list) = &attr.meta {
+                            if let Ok(sam) = syn::parse2::<StrAttrMap>(list.tokens.clone()) {
+                                if sam.contains_key("str") {
+                                    content_type = "text/plain".to_string();
+                                }
+                            }
+                        }
+                    }
+                }
+
                 request_body = Some(crate::utoipa::config::RequestBodyConfig {
                     ty,
                     description,
                     required: true,
-                    content_type: "application/json".to_string(),
+                    content_type,
                 });
                 continue;
             }
-            
+
             // 尝试从类型推断（Miko 提取器）
             let (extractor_info, inner_type) = analyze_extractor_type(&pat_type.ty);
-            
+
             // 特殊处理：检查是否是 Json<T> 或 Form<T>
             if let Type::Path(type_path) = &*pat_type.ty {
                 if let Some(last_segment) = type_path.path.segments.last() {
                     let type_name = last_segment.ident.to_string();
                     if matches!(type_name.as_str(), "Json" | "Form") {
                         let description = extract_desc_from_attrs(&pat_type.attrs);
+                        let content_type = if type_name.as_str() == "Form" {
+                            "application/x-www-form-urlencoded".to_string()
+                        } else {
+                            "application/json".to_string()
+                        };
+
                         request_body = Some(crate::utoipa::config::RequestBodyConfig {
                             ty: inner_type.unwrap_or_else(|| (*pat_type.ty).clone()),
                             description,
                             required: true,
-                            content_type: "application/json".to_string(),
+                            content_type,
                         });
                         continue;
                     }
                 }
             }
-            
+
             // 检查是否有 #[path] 或 #[query] 等标记
-            let location = determine_param_location(&pat_type.attrs)
-                .or(extractor_info);
-            
+            let location = determine_param_location(&pat_type.attrs).or(extractor_info);
+
             if let Some(loc) = location {
                 // 提取参数名
                 if let Pat::Ident(pat_ident) = &*pat_type.pat {
                     let param_name = pat_ident.ident.to_string();
-                    
+
                     // 提取 #[desc] 描述
                     let description = extract_desc_from_attrs(&pat_type.attrs);
-                    
+
                     // 获取实际类型(可能包含 extractor 的内部类型)
                     let base_type = inner_type.unwrap_or_else(|| (*pat_type.ty).clone());
-                    
+
                     // 判断类型是否是 Option<T>
                     // 注意:我们保持类型为 Option<T>,不提取内部类型
                     // utoipa 会自动从 Option<T> 推断 required=false
                     let is_optional = is_option_type(&base_type);
-                    
+
                     params.push(ParamConfig {
                         name: param_name,
-                        ty: base_type,  // 保持原始类型,可能是 Option<T>
+                        ty: base_type, // 保持原始类型,可能是 Option<T>
                         location: loc,
                         description,
-                        required: !is_optional,  // Option<T> 类型为可选参数
+                        required: !is_optional, // Option<T> 类型为可选参数
                         deprecated: false,
                         example: None,
                     });
@@ -116,7 +142,25 @@ pub fn infer_params_from_fn_args(inputs: &punctuated::Punctuated<FnArg, token::C
             }
         }
     }
-    
+    // 如果还没有 request_body，检查最后一个参数（且无属性）是否为 String
+    if request_body.is_none() {
+        if let Some(last_arg) = inputs.last() {
+            if let FnArg::Typed(pat_type) = last_arg {
+                if pat_type.attrs.is_empty() {
+                    let ty = (*pat_type.ty).clone();
+                    if is_string_type(&ty) {
+                        request_body = Some(crate::utoipa::config::RequestBodyConfig {
+                            ty,
+                            description: None,
+                            required: true,
+                            content_type: "text/plain".to_string(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
     (params, request_body)
 }
 
@@ -127,7 +171,7 @@ fn analyze_extractor_type(ty: &Type) -> (Option<ParamLocation>, Option<Type>) {
     if let Type::Path(type_path) = ty {
         if let Some(last_segment) = type_path.path.segments.last() {
             let extractor_name = last_segment.ident.to_string();
-            
+
             // 先检查是否是已知的提取器类型
             let location = match extractor_name.as_str() {
                 "Path" => Some(ParamLocation::Path),
@@ -136,7 +180,7 @@ fn analyze_extractor_type(ty: &Type) -> (Option<ParamLocation>, Option<Type>) {
                 "State" | "Extension" | "Extensions" | "Method" | "Uri" => None, // 忽略这些
                 _ => return (None, None), // 不是提取器，直接返回
             };
-            
+
             // 只有当确认是提取器时，才提取泛型参数
             let inner_type = if let PathArguments::AngleBracketed(args) = &last_segment.arguments {
                 args.args.first().and_then(|arg| {
@@ -149,16 +193,16 @@ fn analyze_extractor_type(ty: &Type) -> (Option<ParamLocation>, Option<Type>) {
             } else {
                 None
             };
-            
+
             // 对于 Json/Form，我们在外部特殊处理
             if matches!(extractor_name.as_str(), "Json" | "Form") {
                 return (None, inner_type);
             }
-            
+
             return (location, inner_type);
         }
     }
-    
+
     (None, None)
 }
 
@@ -175,6 +219,21 @@ fn is_option_type(ty: &Type) -> bool {
         }
     }
     false
+}
+
+/// 判断类型是否是 String
+fn is_string_type(ty: &Type) -> bool {
+    match ty {
+        Type::Path(path) => {
+            path.path
+                .segments
+                .last()
+                .map(|s| s.ident == "String")
+                .unwrap_or(false)
+                || path.path.is_ident("String")
+        }
+        _ => false,
+    }
 }
 
 /// 根据参数属性确定参数位置
@@ -219,7 +278,7 @@ pub fn infer_response_from_return_type(_output: &ReturnType) -> Option<ResponseC
 fn extract_response_body_type(ty: &Type) -> Option<Type> {
     if let Type::Path(type_path) = ty {
         let last_segment = type_path.path.segments.last()?;
-        
+
         match last_segment.ident.to_string().as_str() {
             "Result" => {
                 // Result<Json<User>, Error> -> 提取 Ok 类型
@@ -248,7 +307,7 @@ fn extract_response_body_type(ty: &Type) -> Option<Type> {
             _ => {}
         }
     }
-    
+
     None
 }
 
@@ -259,7 +318,7 @@ pub fn extract_path_params(path: &str) -> Vec<String> {
     let mut params = Vec::new();
     let mut in_brace = false;
     let mut current_param = String::new();
-    
+
     for ch in path.chars() {
         match ch {
             '{' => {
@@ -279,7 +338,7 @@ pub fn extract_path_params(path: &str) -> Vec<String> {
             }
         }
     }
-    
+
     params
 }
 
@@ -294,10 +353,10 @@ pub fn infer_path_from_fn_name(fn_name: &str) -> String {
         .trim_start_matches("put_")
         .trim_start_matches("delete_")
         .trim_start_matches("patch_");
-    
+
     // 将下划线转换为斜杠
     let path = name.replace('_', "/");
-    
+
     format!("/{}", path)
 }
 
@@ -308,19 +367,19 @@ pub fn infer_openapi_config(
     fn_output: &ReturnType,
 ) -> OpenApiConfig {
     let mut config = OpenApiConfig::new();
-    
+
     // 提取文档注释
     let (summary, description) = extract_doc_comments(fn_attrs);
     config.auto_summary = summary;
     config.auto_description = description;
-    
+
     // 推断参数和请求体
     let (params, request_body) = infer_params_from_fn_args(fn_inputs);
     config.auto_params = params;
     config.auto_request_body = request_body;
-    
+
     // 推断响应（当前返回 None）
     config.auto_response = infer_response_from_return_type(fn_output);
-    
+
     config
 }
