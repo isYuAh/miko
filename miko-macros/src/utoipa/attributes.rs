@@ -19,13 +19,13 @@ impl Parse for UResponseAttr {
         let mut description = String::new();
         let mut body = None;
         let mut content_type = None;
-        
+
         // 直接解析键值对，不需要额外的括号
         // 因为 parse_args 已经处理了外层括号
         while !input.is_empty() {
             let key: Ident = input.parse()?;
             input.parse::<Token![=]>()?;
-            
+
             match key.to_string().as_str() {
                 "status" => {
                     let lit: LitInt = input.parse()?;
@@ -46,13 +46,13 @@ impl Parse for UResponseAttr {
                     return Err(Error::new(key.span(), format!("Unknown key: {}", key)));
                 }
             }
-            
+
             // 可选的逗号
             if input.peek(Token![,]) {
                 input.parse::<Token![,]>()?;
             }
         }
-        
+
         Ok(UResponseAttr {
             status,
             description,
@@ -95,7 +95,9 @@ pub struct USummaryAttr {
 impl Parse for USummaryAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let lit: LitStr = input.parse()?;
-        Ok(USummaryAttr { summary: lit.value() })
+        Ok(USummaryAttr {
+            summary: lit.value(),
+        })
     }
 }
 
@@ -108,7 +110,61 @@ pub struct UDescriptionAttr {
 impl Parse for UDescriptionAttr {
     fn parse(input: ParseStream) -> Result<Self> {
         let lit: LitStr = input.parse()?;
-        Ok(UDescriptionAttr { description: lit.value() })
+        Ok(UDescriptionAttr {
+            description: lit.value(),
+        })
+    }
+}
+
+/// 解析 #[u_request_body(content = Multipart, content_type = "multipart/form-data", description = "文件上传")]
+#[derive(Debug, Clone)]
+pub struct URequestBodyAttr {
+    pub content: Type,
+    pub description: Option<String>,
+    pub content_type: Option<String>,
+}
+
+impl Parse for URequestBodyAttr {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut content = None;
+        let mut description = None;
+        let mut content_type = None;
+
+        while !input.is_empty() {
+            let key: Ident = input.parse()?;
+            input.parse::<Token![=]>()?;
+
+            match key.to_string().as_str() {
+                "content" => {
+                    content = Some(input.parse()?);
+                }
+                "description" => {
+                    let lit: LitStr = input.parse()?;
+                    description = Some(lit.value());
+                }
+                "content_type" => {
+                    let lit: LitStr = input.parse()?;
+                    content_type = Some(lit.value());
+                }
+                _ => {
+                    return Err(Error::new(key.span(), format!("Unknown key: {}", key)));
+                }
+            }
+
+            // 可选的逗号
+            if input.peek(Token![,]) {
+                input.parse::<Token![,]>()?;
+            }
+        }
+
+        let content =
+            content.ok_or_else(|| Error::new(input.span(), "Missing required field: content"))?;
+
+        Ok(URequestBodyAttr {
+            content,
+            description,
+            content_type,
+        })
     }
 }
 
@@ -128,12 +184,12 @@ impl Parse for UParamAttr {
         let mut description = None;
         let mut example = None;
         let mut deprecated = false;
-        
+
         // 直接解析，不需要额外的括号
         while !input.is_empty() {
             let key: Ident = input.parse()?;
             input.parse::<Token![=]>()?;
-            
+
             match key.to_string().as_str() {
                 "name" => {
                     let lit: LitStr = input.parse()?;
@@ -154,12 +210,12 @@ impl Parse for UParamAttr {
                     return Err(Error::new(key.span(), format!("Unknown key: {}", key)));
                 }
             }
-            
+
             if input.peek(Token![,]) {
                 input.parse::<Token![,]>()?;
             }
         }
-        
+
         Ok(UParamAttr {
             name,
             description,
@@ -172,10 +228,10 @@ impl Parse for UParamAttr {
 /// 从函数属性中提取所有 utoipa 相关配置
 pub fn parse_utoipa_attrs(attrs: &[Attribute]) -> crate::utoipa::config::OpenApiConfig {
     let mut config = crate::utoipa::config::OpenApiConfig::new();
-    
+
     for attr in attrs {
         let path = attr.path();
-        
+
         if path.is_ident("u_response") {
             if let Ok(resp) = attr.parse_args::<UResponseAttr>() {
                 config.user_responses.push(resp.into());
@@ -194,8 +250,19 @@ pub fn parse_utoipa_attrs(attrs: &[Attribute]) -> crate::utoipa::config::OpenApi
             }
         } else if path.is_ident("u_deprecated") {
             config.deprecated = true;
+        } else if path.is_ident("u_request_body") {
+            if let Ok(req_body) = attr.parse_args::<URequestBodyAttr>() {
+                config.user_request_body = Some(crate::utoipa::config::RequestBodyConfig {
+                    ty: req_body.content,
+                    description: req_body.description,
+                    required: true,
+                    content_type: req_body
+                        .content_type
+                        .unwrap_or_else(|| "application/json".to_string()),
+                });
+            }
         }
     }
-    
+
     config
 }

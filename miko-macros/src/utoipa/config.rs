@@ -61,9 +61,11 @@ pub struct OpenApiConfig {
     pub user_params: Vec<ParamConfig>,
     /// 用户显式提供的响应配置
     pub user_responses: Vec<ResponseConfig>,
+    /// 用户显式提供的请求体配置
+    pub user_request_body: Option<RequestBodyConfig>,
     /// 是否弃用
     pub deprecated: bool,
-    
+
     // 自动推断的信息
     /// 从文档注释提取的 summary
     pub auto_summary: Option<String>,
@@ -92,28 +94,30 @@ impl OpenApiConfig {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// 获取最终的 summary（用户配置优先）
     pub fn final_summary(&self) -> Option<&str> {
-        self.user_summary.as_deref()
+        self.user_summary
+            .as_deref()
             .or(self.auto_summary.as_deref())
     }
-    
+
     /// 获取最终的 description（优先用户配置，否则用自动提取）
     pub fn final_description(&self) -> Option<&str> {
-        self.user_description.as_deref()
+        self.user_description
+            .as_deref()
             .or(self.auto_description.as_deref())
     }
-    
+
     /// 获取最终的 tags
     pub fn final_tags(&self) -> &[String] {
         &self.user_tags
     }
-    
+
     /// 合并参数：用户参数可以覆盖自动推断的参数
     pub fn final_params(&self) -> Vec<ParamConfig> {
         let mut params = self.auto_params.clone();
-        
+
         // 用户定义的参数覆盖自动推断的
         for user_param in &self.user_params {
             if let Some(pos) = params.iter().position(|p| p.name == user_param.name) {
@@ -122,22 +126,29 @@ impl OpenApiConfig {
                 params.push(user_param.clone());
             }
         }
-        
+
         params
     }
-    
+
     /// 合并响应：自动推断的 200 响应 + 用户定义的其他响应
     pub fn final_responses(&self) -> Vec<ResponseConfig> {
         let mut responses = Vec::new();
-        
+
         // 添加自动推断的成功响应
         if let Some(ref auto_resp) = self.auto_response {
             responses.push(auto_resp.clone());
         }
-        
+
         // 添加用户定义的响应
         responses.extend(self.user_responses.iter().cloned());
-        
+
         responses
+    }
+
+    /// 获取最终的请求体配置（用户配置优先）
+    pub fn final_request_body(&self) -> Option<&RequestBodyConfig> {
+        self.user_request_body
+            .as_ref()
+            .or(self.auto_request_body.as_ref())
     }
 }

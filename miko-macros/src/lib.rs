@@ -249,6 +249,36 @@ pub fn u_description(_attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[cfg(feature = "utoipa")]
+/// 标记自定义请求体
+///
+/// 用于处理无法自动推断的请求体类型，比如 `Multipart`。
+/// 当使用此宏时，会覆盖自动推断的请求体配置。
+///
+/// 参数：
+/// - `content`: 请求体的类型（必需）
+/// - `content_type`: Content-Type 头（可选，默认为 "application/json"）
+/// - `description`: 请求体描述（可选）
+///
+/// 用法：
+/// ```rust
+/// use miko::http::extractor::Multipart;
+///
+/// #[post("/upload")]
+/// #[u_request_body(
+///     content = Multipart,
+///     content_type = "multipart/form-data",
+///     description = "文件上传"
+/// )]
+/// async fn upload_file(multipart: Multipart) -> impl IntoResponse {
+///     // 处理文件上传
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn u_request_body(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[cfg(feature = "utoipa")]
 /// 标记参数补充信息
 ///
 /// 用法：

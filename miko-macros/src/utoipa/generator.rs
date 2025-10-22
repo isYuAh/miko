@@ -139,7 +139,7 @@ fn generate_params_tokens(config: &OpenApiConfig) -> TokenStream {
 
 /// 生成 request_body 部分
 fn generate_request_body_tokens(config: &OpenApiConfig) -> TokenStream {
-    if let Some(ref body) = config.auto_request_body {
+    if let Some(body) = config.final_request_body() {
         let ty = &body.ty;
         let content_type = &body.content_type;
         
