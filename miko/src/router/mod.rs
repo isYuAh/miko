@@ -242,11 +242,16 @@ impl<S: Send + Sync + 'static> Router<S> {
     /// 将另一个 Router 挂载到指定前缀
     ///
     /// 被挂载的 Router 内部匹配到的是去除前缀后的路径与参数
+    /// 被挂载 Router 的 layers 会自动应用到其所有路由
     pub fn nest<T>(&mut self, prefix: &str, mut other: Router<T>) -> &mut Self {
         let prefix = prefix.trim_end_matches('/').to_string();
+        let layers = std::mem::take(&mut other.layers);
 
         for (method, _) in other.routes.drain() {
-            for (path, svc) in other.path_map.get_mut(&method).unwrap().drain() {
+            for (path, mut svc) in other.path_map.get_mut(&method).unwrap().drain() {
+                for apply in &layers {
+                    svc = apply(svc);
+                }
                 let layered = NestLayer::new(&prefix).layer(svc);
                 let boxed: HttpSvc<Req> = BoxCloneService::new(layered);
                 let new_path = format!("{}{}", prefix, path);
