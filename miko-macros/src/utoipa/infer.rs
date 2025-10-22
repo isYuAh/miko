@@ -64,10 +64,10 @@ pub fn infer_params_from_fn_args(
                 let mut content_type = "application/json".to_string();
                 use crate::toolkit::attr::StrAttrMap;
                 for attr in &pat_type.attrs {
-                    if attr.path.is_ident("body") {
+                    if attr.path().is_ident("body") {
                         if let Meta::List(list) = &attr.meta {
                             if let Ok(sam) = syn::parse2::<StrAttrMap>(list.tokens.clone()) {
-                                if sam.contains_key("str") {
+                                if sam.map.contains_key("str") {
                                     content_type = "text/plain".to_string();
                                 }
                             }
