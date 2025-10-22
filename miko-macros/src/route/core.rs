@@ -1,5 +1,6 @@
 use crate::extractor::body::deal_with_body_attr;
 use crate::extractor::path::deal_with_path_attr;
+use crate::route::layer::extract_layer_attrs;
 use crate::route::{RouteAttr, build_register_expr};
 use crate::toolkit::exactors::build_struct_from_query;
 use crate::toolkit::rout_arg::{
@@ -23,9 +24,12 @@ use crate::utoipa::{
 /// - 修改函数签名（例如自动设置返回类型）；
 /// - 解析并重写参数以注入 path/body/query/dep/config 等提取器或获取语句；
 /// - 生成临时的 Query 结构体（如需）；
+/// - 提取并处理 layer 属性；
 /// - 将用户函数体和自动生成的注入语句合并为最终的宏展开。
 pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
     let fn_name = fn_item.sig.ident.clone();
+    let layer_attrs = extract_layer_attrs(&fn_item.attrs);
+    fn_item.attrs.retain(|attr| !attr.path().is_ident("layer"));
 
     // utoipa: 在处理前保存原始签名和属性用于推断
     #[cfg(feature = "utoipa")]
@@ -93,7 +97,7 @@ pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
     // 展开
     let user_stmts = &fn_item.block.stmts.clone();
     let inventory_collect: Option<proc_macro2::TokenStream> = if cfg!(feature = "auto") {
-        Some(build_register_expr(&args, &fn_name.clone()))
+        Some(build_register_expr(&args, &fn_name.clone(), &layer_attrs))
     } else {
         None
     };
@@ -146,6 +150,8 @@ pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
 #[cfg(feature = "utoipa")]
 pub fn route_handler_no_register(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
     let fn_name = fn_item.sig.ident.clone();
+    let _layer_attrs = extract_layer_attrs(&fn_item.attrs);
+    fn_item.attrs.retain(|attr| !attr.path().is_ident("layer"));
 
     // 保存原始签名用于 OpenAPI 推断
     let original_attrs = fn_item.attrs.clone();

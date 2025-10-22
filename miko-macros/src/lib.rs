@@ -376,6 +376,48 @@ pub fn body(_attr: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
+/// 标记 Tower Layer
+///
+/// 用于在路由处理函数上应用 Tower Layer 中间件。
+/// 可以使用多个 `#[layer]` 属性，它们将从上到下声明，从内到外应用。
+///
+/// 用法:
+/// ```rust
+/// use tower_http::timeout::TimeoutLayer;
+/// use std::time::Duration;
+///
+/// // 单个 layer
+/// #[get("/users/{id}")]
+/// #[layer(TimeoutLayer::new(Duration::from_secs(30)))]
+/// async fn get_user(#[path] id: i32) -> impl IntoResponse {
+///     // ...
+/// }
+///
+/// // 多个 layer
+/// #[post("/users")]
+/// #[layer(TimeoutLayer::new(Duration::from_secs(30)))]
+/// #[layer(CompressionLayer::new())]
+/// async fn create_user(#[body] user: User) -> impl IntoResponse {
+///     // 调用链: CompressionLayer -> TimeoutLayer -> handler
+/// }
+///
+/// // 使用函数
+/// fn timeout_layer() -> TimeoutLayer {
+///     TimeoutLayer::new(Duration::from_secs(30))
+/// }
+///
+/// #[get("/items/{id}")]
+/// #[layer(timeout_layer())]
+/// async fn get_item(#[path] id: i32) -> impl IntoResponse {
+///     // ...
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn layer(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    // 这个宏不做任何转换，只是作为标记供 route 宏读取
+    item
+}
+
 #[cfg(feature = "utoipa")]
 /// 仅生成 OpenAPI 文档，不自动注册路由
 ///

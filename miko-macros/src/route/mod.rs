@@ -1,4 +1,5 @@
 pub mod core;
+pub mod layer;
 
 use crate::toolkit::attr::StrAttrMap;
 use hyper::Method;
@@ -6,6 +7,8 @@ use miko_core::IntoMethods;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
+
+pub use layer::LayerAttr;
 
 #[derive(Debug)]
 pub struct RouteAttr {
@@ -37,17 +40,48 @@ impl Parse for RouteAttr {
 /// 为路由属性生成注册路由到全局路由器（inventory 提交）的代码片段。
 ///
 /// 会根据 `RouteAttr` 中的 method 列表生成对不同 HTTP 方法的 `router.route(...)` 调用。
-pub fn build_register_expr(ra: &RouteAttr, fn_name: &Ident) -> TokenStream {
+/// 如果提供了 layers，会自动包装 handler。
+pub fn build_register_expr(ra: &RouteAttr, fn_name: &Ident, layers: &[LayerAttr]) -> TokenStream {
     let path = ra.path.clone();
     let methods = if let Some(method) = ra.method.clone() {
         method
     } else {
         vec![Method::GET]
     };
+
     let mut stmts = Vec::new();
-    for method in &methods {
-        let method_name = format_ident!("{}", method.as_str().to_uppercase());
-        stmts.push(quote! {router.route(::miko::hyper::Method::#method_name, #path, #fn_name);});
+
+    if layers.is_empty() {
+        // 没有 layer，直接注册
+        for method in &methods {
+            let method_name = format_ident!("{}", method.as_str().to_uppercase());
+            stmts.push(quote! {
+                router.route(::miko::hyper::Method::#method_name, #path, #fn_name);
+            });
+        }
+    } else {
+        // 有 layers，使用已有的 service 方法
+        let layer_exprs: Vec<_> = layers.iter().map(|l| &l.layer_expr).collect();
+
+        for method in &methods {
+            let _method_name = format_ident!("{}", method.as_str().to_uppercase());
+            let service_method_name = format_ident!("{}_service", method.as_str().to_lowercase());
+            stmts.push(quote! {
+                {
+                    let __handler = #fn_name;
+                    let __svc = ::miko::handler::handler::handler_to_svc(
+                        ::std::sync::Arc::new(
+                            ::miko::handler::handler::TypedHandler::new(__handler, ::std::sync::Arc::new(()))
+                        )
+                    );
+                    #(
+                        let __svc = ::tower::Layer::layer(&#layer_exprs, __svc);
+                    )*
+                    let __boxed = ::tower::util::BoxCloneService::new(__svc);
+                    router.#service_method_name(#path, __boxed);
+                }
+            });
+        }
     }
 
     quote! {

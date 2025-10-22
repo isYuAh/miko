@@ -9,6 +9,7 @@ pub use miko_macros::*;
 #[cfg(feature = "auto")]
 pub mod auto;
 pub mod dependency_container;
+pub mod endpoint;
 pub mod error;
 pub mod extractor;
 pub mod http;
