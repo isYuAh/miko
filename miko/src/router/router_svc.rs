@@ -1,7 +1,7 @@
 use crate::error::{clear_trace_id, set_trace_id};
 use crate::handler::handler::{Req, Resp};
 use crate::router::Router;
-use miko_core::fast_builder::ResponseBuilder;
+use crate::{AppError, IntoResponse};
 use std::convert::Infallible;
 use std::{
     future::Future,
@@ -72,7 +72,7 @@ impl<S: Send + Sync + 'static> Service<Req> for RouterSvc<S> {
                 resp
             }),
             None => Box::pin(async move {
-                let resp = ResponseBuilder::not_found();
+                let resp = AppError::NotFound("404 Not Found".to_string()).into_response();
 
                 // 记录请求完成(404)
                 let elapsed = start.elapsed();
@@ -87,7 +87,7 @@ impl<S: Send + Sync + 'static> Service<Req> for RouterSvc<S> {
 
                 // 清理 trace_id
                 clear_trace_id();
-                resp
+                Ok(resp)
             }),
         }
     }

@@ -217,24 +217,25 @@ impl<S: Send + Sync + 'static> Router<S> {
     }
 
     /// 合并另一个 Router，所有路由与索引一并合并
-    pub fn merge<T>(&mut self, other: Router<T>) -> &mut Self {
-        for (method, router) in other.routes {
-            self.routes
-                .entry(method.clone())
-                .or_insert_with(|| MRouter::new())
-                .merge(router)
-                .unwrap();
-            self.path_map
-                .entry(method.clone())
-                .or_insert_with(|| HashMap::new())
-                .extend(
-                    other
-                        .path_map
-                        .get(&method)
-                        .unwrap()
-                        .iter()
-                        .map(|(k, v)| (k.clone(), v.clone())),
-                );
+    pub fn merge<T>(&mut self, mut other: Router<T>) -> &mut Self {
+        let layers = std::mem::take(&mut other.layers);
+
+        for (method, _) in other.routes.drain() {
+            for (path, mut svc) in other.path_map.get_mut(&method).unwrap().drain() {
+                for apply in &layers {
+                    svc = apply(svc);
+                }
+                let boxed: HttpSvc<Req> = BoxCloneService::new(svc);
+                self.routes
+                    .entry(method.clone())
+                    .or_insert_with(|| MRouter::new())
+                    .insert(&path, boxed.clone())
+                    .unwrap();
+                self.path_map
+                    .entry(method.clone())
+                    .or_insert_with(|| HashMap::new())
+                    .insert(path, boxed.clone());
+            }
         }
         self
     }

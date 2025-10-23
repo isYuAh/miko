@@ -1,9 +1,10 @@
-use hyper::{HeaderMap, StatusCode};
-use miko::endpoint::LayerExt;
+use bytes::Bytes;
+use http_body_util::{BodyExt, Full};
+use hyper::{HeaderMap, Response, StatusCode};
 use miko::endpoint::layer::WithState;
 use miko::ext::uploader::{DiskStorage, DiskStorageConfig, Uploader};
 use miko::extractor::multipart::MultipartResult;
-use miko::extractor::{Json, Query};
+use miko::extractor::{Json, Query, State};
 use miko::http::response::into_response::IntoResponse;
 use miko::http::response::sse::SseSender;
 use miko::macros::*;
@@ -12,7 +13,6 @@ use miko::*;
 use miko_core::Req;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[derive(Serialize)]
@@ -159,9 +159,24 @@ async fn get_user(
     println!("Get user: {}", "123");
 }
 
+async fn no_macro(State(state): State<String>) -> &'static str {
+    "Hello from no_macro"
+}
+
+#[get("/custom")]
+async fn custom() -> impl IntoResponse {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("X-Custom", "value")
+        .body(Full::new(Bytes::from("Hello")).boxed())
+        .unwrap()
+}
+
 #[miko(sse)]
 async fn main() {
     tracing_subscriber::fmt::init();
+    let mut router = router.with_state("Global State".to_string());
+    router.service("/no_macro", no_macro.with_state(router.state.clone()));
     router.service(
         "/uploader",
         Uploader::single(DiskStorage::new(

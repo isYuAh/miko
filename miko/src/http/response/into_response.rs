@@ -3,8 +3,8 @@ use crate::handler::handler::{Resp, RespBody};
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http_body_util::{BodyExt, Full, StreamBody};
+use hyper::HeaderMap;
 use hyper::{Response, StatusCode, body::Frame};
-use miko_core::fast_builder::ResponseBuilder;
 use serde::Serialize;
 
 /// 将一个类型转换为 HTTP 响应的通用能力
@@ -21,13 +21,21 @@ fn bytes_to_boxed(bytes: Bytes) -> RespBody {
 
 impl IntoResponse for String {
     fn into_response(self) -> Resp {
-        ResponseBuilder::ok(self).unwrap()
+        Response::builder()
+            .status(200)
+            .header("content-type", "text/plain; charset=utf-8")
+            .body(bytes_to_boxed(Bytes::from(self)))
+            .unwrap()
     }
 }
 
 impl IntoResponse for &'static str {
     fn into_response(self) -> Resp {
-        ResponseBuilder::ok(self.to_string()).unwrap()
+        Response::builder()
+            .status(200)
+            .header("content-type", "text/plain; charset=utf-8")
+            .body(bytes_to_boxed(Bytes::from(self)))
+            .unwrap()
     }
 }
 
@@ -117,14 +125,24 @@ where
 
 impl IntoResponse for () {
     fn into_response(self) -> Resp {
-        ResponseBuilder::ok("".to_string()).unwrap()
+        Response::builder()
+            .status(200)
+            .body(miko_core::fast_builder::box_empty_body())
+            .unwrap()
     }
 }
 
-// 实现(StatusCode, Response)的返回
-impl<S, T> IntoResponse for (S, T)
+impl IntoResponse for StatusCode {
+    fn into_response(self) -> Resp {
+        Response::builder()
+            .status(self)
+            .body(miko_core::fast_builder::box_empty_body())
+            .unwrap()
+    }
+}
+
+impl<T> IntoResponse for (StatusCode, T)
 where
-    S: Into<StatusCode>,
     T: IntoResponse,
 {
     fn into_response(self) -> Resp {
@@ -132,6 +150,50 @@ where
         Response::builder()
             .status(self.0)
             .body(body.into_body())
+            .unwrap()
+    }
+}
+
+impl<T> IntoResponse for (HeaderMap, T)
+where
+    T: IntoResponse,
+{
+    fn into_response(self) -> Resp {
+        let mut response = self.1.into_response();
+        let h = response.headers_mut();
+        for (name, value) in self.0 {
+            if name.is_none() {
+                continue;
+            }
+            h.insert(name.unwrap().clone(), value);
+        }
+        response
+    }
+}
+
+impl<T> IntoResponse for (StatusCode, HeaderMap, T)
+where
+    T: IntoResponse,
+{
+    fn into_response(self) -> Resp {
+        let mut response = self.2.into_response();
+        let h = response.headers_mut();
+        for (name, value) in self.1 {
+            if name.is_none() {
+                continue;
+            }
+            h.insert(name.unwrap().clone(), value);
+        }
+        *response.status_mut() = self.0;
+        response
+    }
+}
+
+impl IntoResponse for Vec<u8> {
+    fn into_response(self) -> Resp {
+        Response::builder()
+            .header("content-type", "application/octet-stream")
+            .body(bytes_to_boxed(Bytes::from(self)))
             .unwrap()
     }
 }

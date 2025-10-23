@@ -188,7 +188,7 @@ pub fn build_dep_injector(rfa: &Vec<RouteFnArg>, dep_stmts: &mut Vec<TokenStream
 
 /// 为带有 `#[config(...)]` 的参数生成从配置读取并解析值的语句。
 ///
-/// 支持基础类型 `String`, `u32`, `i32`, `bool`, `f64`，并根据参数是否为 `Option<T>` 决定是否解包或返回可选值。
+/// 支持所有实现 `serde::de::DeserializeOwned` 的类型,包括基础类型、集合、自定义结构体等。
 pub fn build_config_value_injector(
     rfa: &Vec<RouteFnArg>,
     config_value_stmts: &mut Vec<TokenStream>,
@@ -214,48 +214,20 @@ pub fn build_config_value_injector(
 }
 
 fn prase_expr_by_type(ty: &Type, path: String, ident: syn::Ident, unwrap: bool) -> TokenStream {
-    let expr = match ty {
-        Type::Path(TypePath { path, .. }) => {
-            let last = path.segments.last().unwrap();
-            if last.ident == "String" {
-                quote! {
-                    v.as_str().map(|s| s.to_string())
-                }
-            } else if last.ident == "u32" {
-                quote! {
-                    v.as_integer().and_then(|i| i.try_into().ok())
-                }
-            } else if last.ident == "i32" {
-                quote! {
-                    v.as_integer().and_then(|i| i.try_into().ok())
-                }
-            } else if last.ident == "bool" {
-                quote! {
-                    v.as_bool()
-                }
-            } else if last.ident == "f64" {
-                quote! {
-                    v.as_float()
-                }
-            } else {
-                panic!("unsupported config value type: {}", last.ident);
-            }
-        }
-        _ => {
-            panic!("unsupported config value type");
-        }
-    };
     if unwrap {
         quote! {
-            let #ident = ::miko::app::config::get_config_value(#path).and_then(|v| {
-                #expr
-            }).unwrap();
+            let #ident = ::miko::app::config::get_config_value(#path)
+                .and_then(|v| {
+                    v.clone().try_into::<#ty>().ok()
+                })
+                .unwrap();
         }
     } else {
         quote! {
-            let #ident = ::miko::app::config::get_config_value(#path).and_then(|v| {
-                #expr
-            });
+            let #ident = ::miko::app::config::get_config_value(#path)
+                .and_then(|v| {
+                    v.clone().try_into::<#ty>().ok()
+                });
         }
     }
 }

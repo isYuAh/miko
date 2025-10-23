@@ -39,9 +39,8 @@ utoipa = { version = "5", optional = true }
 garde = { version = "0.20", optional = true, features = ["derive"] }
 
 [features]
-full = ["macro", "auto", "ext", "ws", "utoipa", "validation"]
+full = ["macro", "auto", "ext", "utoipa", "validation"]
 macro = ["miko-macros"]
-ws = []
 auto = ["macro", "miko-macros/auto", "inventory"]
 ext = ["tower-http", "httpdate"]
 utoipa = ["miko-macros/utoipa", "dep:utoipa"]

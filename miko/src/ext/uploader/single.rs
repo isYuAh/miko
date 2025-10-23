@@ -45,7 +45,7 @@ where
             loop {
                 let field = multipart.next_field().await;
                 if let Err(e) = field {
-                    return ResponseBuilder::internal_server_error(Some(e.to_string()));
+                    return Ok(crate::AppError::InternalServerError(e.to_string()).into_response());
                 }
                 if let Some(field) = field.unwrap() {
                     if field.file_name().is_some() {
@@ -59,13 +59,13 @@ where
                         continue;
                     }
                 } else {
-                    return ResponseBuilder::internal_server_error(Some("No field".to_string()));
+                    return Ok(crate::AppError::BadRequest("No file field found".to_string()).into_response());
                 }
             }
             let ffield = inner.process(ffield.unwrap()).await;
             match ffield {
                 Ok(file) => {
-                    ResponseBuilder::ok(format!("uploaded file {}", file.original_filename))
+                    Ok(format!("uploaded file {}", file.original_filename).into_response())
                 }
                 Err(e) => Ok((StatusCode::BAD_REQUEST, e.into_response()).into_response()),
             }
