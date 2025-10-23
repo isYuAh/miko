@@ -5,9 +5,10 @@ use crate::toolkit::attr::StrAttrMap;
 use crate::toolkit::impl_operation::{get_constructor, inject_deps};
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{ItemFn, parse_macro_input};
+use syn::{ItemFn, ItemMod, parse_macro_input};
 
 mod extractor;
+mod mod_transform;
 mod route;
 mod toolkit;
 
@@ -378,22 +379,24 @@ pub fn body(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
 /// 标记 Tower Layer
 ///
-/// 用于在路由处理函数上应用 Tower Layer 中间件。
-/// 可以使用多个 `#[layer]` 属性，它们将从上到下声明，从内到外应用。
+/// 用于在路由处理函数或模块上应用 Tower Layer 中间件。
+///
+/// **在函数上使用：** 可以使用多个 `#[layer]` 属性，它们将从上到下声明，从内到外应用。
+/// **在模块上使用：** 为模块内的所有路由自动添加指定的 layer。
 ///
 /// 用法:
 /// ```rust
 /// use tower_http::timeout::TimeoutLayer;
 /// use std::time::Duration;
 ///
-/// // 单个 layer
+/// // 单个 layer（函数级）
 /// #[get("/users/{id}")]
 /// #[layer(TimeoutLayer::new(Duration::from_secs(30)))]
 /// async fn get_user(#[path] id: i32) -> impl IntoResponse {
 ///     // ...
 /// }
 ///
-/// // 多个 layer
+/// // 多个 layer（函数级）
 /// #[post("/users")]
 /// #[layer(TimeoutLayer::new(Duration::from_secs(30)))]
 /// #[layer(CompressionLayer::new())]
@@ -401,20 +404,23 @@ pub fn body(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     // 调用链: CompressionLayer -> TimeoutLayer -> handler
 /// }
 ///
-/// // 使用函数
-/// fn timeout_layer() -> TimeoutLayer {
-///     TimeoutLayer::new(Duration::from_secs(30))
-/// }
-///
-/// #[get("/items/{id}")]
-/// #[layer(timeout_layer())]
-/// async fn get_item(#[path] id: i32) -> impl IntoResponse {
-///     // ...
+/// // 模块级 layer
+/// #[layer(AuthLayer::new())]
+/// mod protected {
+///     #[get("/data")]
+///     async fn get_data() { }  // 自动应用 AuthLayer
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn layer(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    // 这个宏不做任何转换，只是作为标记供 route 宏读取
+pub fn layer(attr: TokenStream, item: TokenStream) -> TokenStream {
+    if let Ok(mut mod_item) = syn::parse::<ItemMod>(item.clone()) {
+        let layer_attr = parse_macro_input!(attr as mod_transform::ModLayerAttr);
+        mod_transform::apply_transform_to_module(
+            &mut mod_item,
+            mod_transform::TransformOp::Layer(layer_attr.expr),
+        );
+        return quote! { #mod_item }.into();
+    }
     item
 }
 
@@ -459,4 +465,34 @@ pub fn miko_path(attr: TokenStream, item: TokenStream) -> TokenStream {
     // 为了简化，我们生成一个不带 inventory 的版本
     use crate::route::core::route_handler_no_register;
     route_handler_no_register(args, fn_item)
+}
+
+/// # Prefix 宏：模块路由前缀
+///
+/// 用法：在 `mod` 块上使用 `#[prefix("/api")]`，会自动为模块内的所有路由添加前缀。
+///
+/// **注意：和Router::nest不同，prefix只是简单地在内部路由路径前添加前缀，并不会将运行时内部路由获取到的路径进行修改。**
+///
+/// 行为：
+/// - 对模块内直接的函数（如果有路由宏）添加路径前缀
+/// - 对模块内的嵌套 mod 也应用相同的前缀（如果嵌套 mod 内部没有 prefix，会继续附加）
+/// - 支持路径的自动合并（处理多余的斜杠）
+///
+/// 示例：
+/// ```rust
+/// #[prefix("/api")]
+/// mod api {
+///     #[get("/users")]
+///     async fn get_users() { }  // 实际注册为 GET /api/users
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn prefix(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let prefix_attr = parse_macro_input!(attr as mod_transform::PrefixAttr);
+    let mut mod_item = parse_macro_input!(item as ItemMod);
+    mod_transform::apply_transform_to_module(
+        &mut mod_item,
+        mod_transform::TransformOp::Prefix(prefix_attr.path),
+    );
+    quote! { #mod_item }.into()
 }

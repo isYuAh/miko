@@ -1,3 +1,4 @@
+use quote::quote;
 use std::collections::HashMap;
 use syn::parse::{Parse, ParseStream};
 use syn::{Expr, ExprLit, Lit, LitStr, Meta, Token};
@@ -67,5 +68,29 @@ impl StrAttrMap {
             .get(key)
             .map(|s| s.to_string())
             .or(self.default.clone())
+    }
+
+    pub fn to_token_stream(&self) -> proc_macro2::TokenStream {
+        let mut tokens = proc_macro2::TokenStream::new();
+        if let Some(ref default) = self.default {
+            tokens.extend(quote! {
+                #default
+            });
+            if !self.map.is_empty() {
+                tokens.extend(quote! { , });
+            }
+        }
+        let entries: Vec<_> = self.map.iter().collect();
+        for (idx, (key, value)) in entries.iter().enumerate() {
+            let key_ident = syn::Ident::new(key, proc_macro2::Span::call_site());
+            tokens.extend(quote! {
+                #key_ident = #value
+            });
+            if idx < entries.len() - 1 {
+                tokens.extend(quote! { , });
+            }
+        }
+
+        tokens
     }
 }

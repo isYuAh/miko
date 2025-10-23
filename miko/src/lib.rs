@@ -4,7 +4,7 @@ pub mod ext;
 pub mod handler;
 
 #[cfg(feature = "macro")]
-pub use miko_macros::*;
+pub use miko_macros as macros;
 
 #[cfg(feature = "auto")]
 pub mod auto;

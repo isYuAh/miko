@@ -71,6 +71,10 @@ required-features = ["full"]
 name = "layer_test"
 required-features = ["full"]
 
+[[example]]
+name = "prefix_test"
+required-features = ["full"]
+
 [dev-dependencies]
 utoipa = { version = "5", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.2", features = ["axum"] }
