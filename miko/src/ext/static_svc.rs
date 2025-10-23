@@ -129,7 +129,8 @@ impl Service<Req> for StaticSvc {
                         let index_path = root.join("index.html");
                         match StaticSvc::serve_file(&index_path, req.method()).await {
                             Ok(resp) => Ok(resp),
-                            Err(_) => Ok(crate::AppError::NotFound("File not found".to_string()).into_response()),
+                            Err(_) => Ok(crate::AppError::NotFound("File not found".to_string())
+                                .into_response()),
                         }
                     } else {
                         Ok(crate::AppError::NotFound("File not found".to_string()).into_response())

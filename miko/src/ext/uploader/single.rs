@@ -59,14 +59,15 @@ where
                         continue;
                     }
                 } else {
-                    return Ok(crate::AppError::BadRequest("No file field found".to_string()).into_response());
+                    return Ok(
+                        crate::AppError::BadRequest("No file field found".to_string())
+                            .into_response(),
+                    );
                 }
             }
             let ffield = inner.process(ffield.unwrap()).await;
             match ffield {
-                Ok(file) => {
-                    Ok(format!("uploaded file {}", file.original_filename).into_response())
-                }
+                Ok(file) => Ok(format!("uploaded file {}", file.original_filename).into_response()),
                 Err(e) => Ok((StatusCode::BAD_REQUEST, e.into_response()).into_response()),
             }
         })
