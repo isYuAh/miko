@@ -5,7 +5,6 @@ use crate::handler::handler::Req;
 use crate::http::response::into_response::IntoResponse;
 use hyper::StatusCode;
 use miko_core::Resp;
-use miko_core::fast_builder::ResponseBuilder;
 use std::convert::Infallible;
 use std::pin::Pin;
 use std::sync::Arc;
