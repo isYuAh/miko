@@ -76,8 +76,6 @@ name = "prefix_test"
 required-features = ["full"]
 
 [dev-dependencies]
-utoipa = { version = "5", features = ["axum_extras"] }
 utoipa-scalar = { version = "0.2", features = ["axum"] }
 tracing-subscriber = "0.3.20"
-garde = { version = "0.20", features = ["derive"] }
 tower-http = { version = "0.6.6", features = ["compression-gzip", "trace"] }
