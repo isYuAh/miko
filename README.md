@@ -113,6 +113,7 @@ async fn search(Query(params): Query<SearchQuery>) -> String {
 }
 ```
 
+```rust
 #[tokio::main]
 async fn main() {
     let router = Router::new()
