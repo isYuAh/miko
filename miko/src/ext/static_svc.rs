@@ -1,3 +1,4 @@
+use crate::http::response::into_response::IntoResponse;
 use crate::router::HttpSvc;
 use http_body_util::BodyExt;
 use hyper::{Method, Response, StatusCode, header};
@@ -41,7 +42,7 @@ impl StaticSvc {
         path
     }
 
-    async fn resolve_index_file(&self, mut path: PathBuf) -> Option<PathBuf> {
+    async fn resolve_index_file(&self, path: PathBuf) -> Option<PathBuf> {
         if let Ok(metadata) = tokio::fs::metadata(&path).await {
             if metadata.is_dir() {
                 for index_file in self.index_files.iter() {
@@ -156,11 +157,8 @@ impl StaticSvc {
                             .unwrap());
                     }
 
-                    let mut buffer = vec![0; content_length as usize];
-                    file.read_exact(&mut buffer).await?;
-                    let stream = futures_util::stream::once(async move {
-                        Ok::<_, std::io::Error>(buffer)
-                    });
+                    let limited_file = file.take(content_length);
+                    let stream = ReaderStream::new(limited_file);
                     let body = FallibleStreamBody::with_size_hint(stream, content_length);
                     return Ok(builder.body(body.boxed()).unwrap());
                 }
@@ -272,8 +270,6 @@ impl Service<Req> for StaticSvc {
     fn call(&mut self, req: Req) -> Self::Future {
         let root = self.root.clone();
         let spa_fallback = self.spa_fallback;
-        let fallback_files = self.fallback_files.clone();
-        let index_files = self.index_files.clone();
         let mut path = self.resolve_path(req.uri().path());
         
         let self_clone = self.clone();
