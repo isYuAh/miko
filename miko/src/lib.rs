@@ -27,6 +27,9 @@ pub use tracing;
 #[cfg(feature = "utoipa")]
 pub use utoipa::{self, IntoParams, OpenApi, ToResponse, ToSchema};
 
+#[cfg(feature = "validation")]
+pub use garde::{self, Validate};
+
 // 导出常用的响应类型
 pub use http::response::into_response::IntoResponse;
 

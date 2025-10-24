@@ -34,7 +34,7 @@ pub fn build_struct_from_query(
         // 根据是否启用 utoipa feature 决定是否派生 IntoParams
         #[cfg(feature = "utoipa")]
         let derives = quote! {
-            #[derive(::miko::serde::Deserialize, ::utoipa::IntoParams)]
+            #[derive(::miko::serde::Deserialize, ::miko::utoipa::IntoParams)]
         };
 
         #[cfg(not(feature = "utoipa"))]

@@ -2,12 +2,12 @@
 //! 
 //! 简单测试用于验证 utoipa 功能
 //! 
-//! 运行: cargo check --example utoipa_test --features full,utoipa
+//! 运行: cargo check --example utoipa_test --features full
 
 use miko_macros::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Serialize, Deserialize, miko::utoipa::ToSchema)]
 struct User {
     #[schema(example = 1)]
     id: i32,
@@ -50,7 +50,7 @@ async fn create_user(
     println!("Create user: {:?}", user);
 }
 
-#[derive(utoipa::OpenApi)]
+#[derive(miko::utoipa::OpenApi)]
 #[openapi(
     info(
         title = "Miko API 测试",
@@ -71,7 +71,7 @@ async fn create_user(
 struct ApiDoc;
 
 fn main() {
-    use utoipa::OpenApi;
+    use miko::utoipa::OpenApi;
     
     let openapi = ApiDoc::openapi();
     println!("✅ OpenAPI 生成成功!");
