@@ -8,7 +8,7 @@
 [![Documentation](https://docs.rs/miko/badge.svg)](https://docs.rs/miko)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[English](README.md) | [中文文档](docs/zh/README.md)
+[中文文档](docs/zh/README.md)
 
 </div>
 
@@ -98,11 +98,20 @@ async fn get_user(Path(id): Path<u32>) -> Json<User> {
     })
 }
 
+```rust
 // 查询参数
+#[derive(Debug, Deserialize)]
+struct SearchQuery {
+    q: Option<String>,
+    page: Option<u32>,
+    per_page: Option<u32>,
+}
+
 #[get("/search")]
-async fn search(Query(params): Query<HashMap<String, String>>) -> String {
+async fn search(Query(params): Query<SearchQuery>) -> String {
     format!("Searching for: {:?}", params)
 }
+```
 
 #[tokio::main]
 async fn main() {
