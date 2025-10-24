@@ -197,3 +197,13 @@ impl IntoResponse for Vec<u8> {
             .unwrap()
     }
 }
+
+impl IntoResponse for serde_json::Value {
+    fn into_response(self) -> Resp {
+        let body = serde_json::to_vec(&self).unwrap();
+        Response::builder()
+            .header("content-type", "application/json")
+            .body(bytes_to_boxed(Bytes::from(body)))
+            .unwrap()
+    }
+}

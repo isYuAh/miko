@@ -66,27 +66,55 @@ impl StaticSvc {
         None
     }
 
-    fn parse_range(range_header: &str, file_size: u64) -> Option<(u64, u64)> {
+    /// 解析 Range 头
+    /// 返回: Ok(Some((start, end))) - 合法范围
+    ///       Ok(None) - 无 Range 或格式不支持
+    ///       Err(()) - Range 超出文件范围 (应返回 416)
+    fn parse_range(range_header: &str, file_size: u64) -> Result<Option<(u64, u64)>, ()> {
         if !range_header.starts_with("bytes=") {
-            return None;
+            return Ok(None);
         }
+        
         let range_str = &range_header[6..];
+        
+        // 暂不支持多范围请求 (如 bytes=0-99,200-299)
+        if range_str.contains(',') {
+            return Ok(None);
+        }
+        
         let parts: Vec<&str> = range_str.split('-').collect();
         if parts.len() != 2 {
-            return None;
+            return Ok(None);
         }
 
-        let start = parts[0].parse::<u64>().ok()?;
+        // 处理 bytes=-500 (最后 500 字节) 的情况
+        if parts[0].is_empty() {
+            if let Ok(suffix_length) = parts[1].parse::<u64>() {
+                if suffix_length == 0 {
+                    return Err(());
+                }
+                let start = file_size.saturating_sub(suffix_length);
+                return Ok(Some((start, file_size - 1)));
+            }
+            return Ok(None);
+        }
+
+        let start = parts[0].parse::<u64>().map_err(|_| ())?;
+        if start >= file_size {
+            return Err(());
+        }
         let end = if parts[1].is_empty() {
+            // bytes=100- 表示从 100 到文件末尾
             file_size - 1
         } else {
-            parts[1].parse::<u64>().ok()?.min(file_size - 1)
+            // bytes=100-200
+            parts[1].parse::<u64>().map_err(|_| ())?.min(file_size - 1)
         };
 
-        if start <= end && start < file_size {
-            Some((start, end))
+        if start <= end {
+            Ok(Some((start, end)))
         } else {
-            None
+            Err(())  // start > end，无效范围
         }
     }
 
@@ -135,32 +163,47 @@ impl StaticSvc {
             builder = builder.header(header::LAST_MODIFIED, datetime);
         }
 
-        // 处理 Range
+        // 处理 Range 请求
         if let Some(range_header) = req.headers().get(header::RANGE) {
             if let Ok(range_str) = range_header.to_str() {
-                if let Some((start, end)) = Self::parse_range(range_str, file_size) {
-                    let content_length = end - start + 1;
-                    let mut file = File::open(path).await?;
-                    file.seek(SeekFrom::Start(start)).await?;
-                    
-                    builder = builder
-                        .status(StatusCode::PARTIAL_CONTENT)
-                        .header(header::CONTENT_LENGTH, content_length)
-                        .header(
-                            header::CONTENT_RANGE,
-                            format!("bytes {}-{}/{}", start, end, file_size),
-                        );
+                match Self::parse_range(range_str, file_size) {
+                    Ok(Some((start, end))) => {
+                        // 合法的 Range 请求
+                        let content_length = end - start + 1;
+                        let mut file = File::open(path).await?;
+                        file.seek(SeekFrom::Start(start)).await?;
+                        
+                        builder = builder
+                            .status(StatusCode::PARTIAL_CONTENT)
+                            .header(header::CONTENT_LENGTH, content_length)
+                            .header(
+                                header::CONTENT_RANGE,
+                                format!("bytes {}-{}/{}", start, end, file_size),
+                            );
 
-                    if method == Method::HEAD {
-                        return Ok(builder
+                        if method == Method::HEAD {
+                            return Ok(builder
+                                .body(miko_core::fast_builder::box_empty_body())
+                                .unwrap());
+                        }
+
+                        // 使用 ReaderStream 读取指定范围的数据
+                        let limited_file = file.take(content_length);
+                        let stream = ReaderStream::new(limited_file);
+                        let body = FallibleStreamBody::with_size_hint(stream, content_length);
+                        return Ok(builder.body(body.boxed()).unwrap());
+                    }
+                    Err(()) => {
+                        // Range 超出范围，返回 416 Range Not Satisfiable
+                        return Ok(Response::builder()
+                            .status(StatusCode::RANGE_NOT_SATISFIABLE)
+                            .header(header::CONTENT_RANGE, format!("bytes */{}", file_size))
                             .body(miko_core::fast_builder::box_empty_body())
                             .unwrap());
                     }
-
-                    let limited_file = file.take(content_length);
-                    let stream = ReaderStream::new(limited_file);
-                    let body = FallibleStreamBody::with_size_hint(stream, content_length);
-                    return Ok(builder.body(body.boxed()).unwrap());
+                    Ok(None) => {
+                        // 无效的 Range 格式或不支持的格式，忽略 Range 头，返回完整文件
+                    }
                 }
             }
         }
