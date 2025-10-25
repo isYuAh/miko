@@ -252,6 +252,7 @@ fn generate_utoipa_attr(
     user_config.auto_description = inferred.auto_description;
     user_config.auto_params = inferred.auto_params;
     user_config.auto_response = inferred.auto_response;
+    user_config.auto_request_body = inferred.auto_request_body;
 
     // 4. 确定 HTTP 方法
     let method = if let Some(ref methods) = args.method {
