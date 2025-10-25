@@ -1,6 +1,7 @@
 # OpenAPI 集成
 
 > **需要 `utoipa` feature**
+> 由于扫描并生成utoipa path是通过get等宏实现的，所以写的时候务必将#[get]放在最顶端
 
 Miko 集成 [utoipa](https://github.com/juhaku/utoipa) 库,为路由自动生成 OpenAPI 3.0 文档。
 

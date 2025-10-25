@@ -63,7 +63,7 @@ async fn main() {
         .get("/custom-error", custom_error)
         .get("/internal-error", internal_error);
 
-    println!("🚀 Server running on http://127.0.0.1:3000");
+    println!("🚀 Server running on http://127.0.0.1:8080");
     println!();
     println!("测试端点:");
     println!("  GET  /                  - 成功响应 (无 trace_id 在响应体中)");
@@ -80,10 +80,10 @@ async fn main() {
     println!();
     println!("测试示例:");
     println!("  # 不带 trace_id 请求 (自动生成)");
-    println!("  curl http://127.0.0.1:3000/not-found");
+    println!("  curl http://127.0.0.1:8080/not-found");
     println!();
     println!("  # 带自定义 trace_id 请求");
-    println!("  curl -H 'x-trace-id: my-custom-trace-123' http://127.0.0.1:3000/validation-error");
+    println!("  curl -H 'x-trace-id: my-custom-trace-123' http://127.0.0.1:8080/validation-error");
     println!();
 
     Application::new_(router).run().await.unwrap();

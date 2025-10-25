@@ -225,15 +225,15 @@ async fn main() {
         .post("/parse-test", parse_json_test);
     println!("{:?}", router.path_map);
 
-    println!("🚀 Server started at http://127.0.0.1:3000");
+    println!("🚀 Server started at http://127.0.0.1:8080");
     println!("\n📝 试试这些请求:");
-    println!("  POST   http://127.0.0.1:3000/users");
-    println!("  GET    http://127.0.0.1:3000/users");
-    println!("  GET    http://127.0.0.1:3000/users/1");
-    println!("  GET    http://127.0.0.1:3000/users/999  (403 Forbidden)");
-    println!("  GET    http://127.0.0.1:3000/users/9999 (404 Not Found)");
-    println!("  PUT    http://127.0.0.1:3000/users/1");
-    println!("  DELETE http://127.0.0.1:3000/users/1    (409 Conflict)");
+    println!("  POST   http://127.0.0.1:8080/users");
+    println!("  GET    http://127.0.0.1:8080/users");
+    println!("  GET    http://127.0.0.1:8080/users/1");
+    println!("  GET    http://127.0.0.1:8080/users/999  (403 Forbidden)");
+    println!("  GET    http://127.0.0.1:8080/users/9999 (404 Not Found)");
+    println!("  PUT    http://127.0.0.1:8080/users/1");
+    println!("  DELETE http://127.0.0.1:8080/users/1    (409 Conflict)");
     println!("\n💡 使用以下 JSON 测试 POST /users:");
     println!(r#"  {{"name": "", "email": "invalid", "age": 15}}"#);
     println!("  应该返回验证错误!\n");

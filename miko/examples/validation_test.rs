@@ -135,42 +135,42 @@ async fn main() {
     println!();
     println!("✅ 有效请求:");
     println!(
-        r#"curl -X POST http://127.0.0.1:3000/users -H "Content-Type: application/json" -d '{{"username":"alice","email":"alice@example.com","password":"password123","age":25}}'"#
+        r#"curl -X POST http://127.0.0.1:8080/users -H "Content-Type: application/json" -d '{{"username":"alice","email":"alice@example.com","password":"password123","age":25}}'"#
     );
     println!();
     println!("❌ 用户名太短 (应该 >= 3):");
     println!(
-        r#"curl -X POST http://127.0.0.1:3000/users -H "Content-Type: application/json" -d '{{"username":"ab","email":"alice@example.com","password":"password123","age":25}}'"#
+        r#"curl -X POST http://127.0.0.1:8080/users -H "Content-Type: application/json" -d '{{"username":"ab","email":"alice@example.com","password":"password123","age":25}}'"#
     );
     println!();
     println!("❌ 邮箱格式错误:");
     println!(
-        r#"curl -X POST http://127.0.0.1:3000/users -H "Content-Type: application/json" -d '{{"username":"alice","email":"not-an-email","password":"password123","age":25}}'"#
+        r#"curl -X POST http://127.0.0.1:8080/users -H "Content-Type: application/json" -d '{{"username":"alice","email":"not-an-email","password":"password123","age":25}}'"#
     );
     println!();
     println!("❌ 密码太短 (应该 >= 8):");
     println!(
-        r#"curl -X POST http://127.0.0.1:3000/users -H "Content-Type: application/json" -d '{{"username":"alice","email":"alice@example.com","password":"123","age":25}}'"#
+        r#"curl -X POST http://127.0.0.1:8080/users -H "Content-Type: application/json" -d '{{"username":"alice","email":"alice@example.com","password":"123","age":25}}'"#
     );
     println!();
     println!("❌ 年龄超出范围 (应该 13-120):");
     println!(
-        r#"curl -X POST http://127.0.0.1:3000/users -H "Content-Type: application/json" -d '{{"username":"alice","email":"alice@example.com","password":"password123","age":150}}'"#
+        r#"curl -X POST http://127.0.0.1:8080/users -H "Content-Type: application/json" -d '{{"username":"alice","email":"alice@example.com","password":"password123","age":150}}'"#
     );
     println!();
     println!("✅ 嵌套验证:");
     println!(
-        r#"curl -X POST http://127.0.0.1:3000/companies -H "Content-Type: application/json" -d '{{"name":"ACME Corp","contact_email":"info@acme.com","address":{{"street":"123 Main St","city":"New York","country_code":"US"}}}}'"#
+        r#"curl -X POST http://127.0.0.1:8080/companies -H "Content-Type: application/json" -d '{{"name":"ACME Corp","contact_email":"info@acme.com","address":{{"street":"123 Main St","city":"New York","country_code":"US"}}}}'"#
     );
     println!();
     println!("❌ 国家代码长度错误 (应该是 2 个字符):");
     println!(
-        r#"curl -X POST http://127.0.0.1:3000/companies -H "Content-Type: application/json" -d '{{"name":"ACME Corp","contact_email":"info@acme.com","address":{{"street":"123 Main St","city":"New York","country_code":"USA"}}}}'"#
+        r#"curl -X POST http://127.0.0.1:8080/companies -H "Content-Type: application/json" -d '{{"name":"ACME Corp","contact_email":"info@acme.com","address":{{"street":"123 Main St","city":"New York","country_code":"USA"}}}}'"#
     );
     println!();
     println!("✅ 可选字段验证:");
     println!(
-        r#"curl -X PUT http://127.0.0.1:3000/profile -H "Content-Type: application/json" -d '{{"display_name":"Alice","website":"https://example.com","bio":"Hello world"}}'"#
+        r#"curl -X PUT http://127.0.0.1:8080/profile -H "Content-Type: application/json" -d '{{"display_name":"Alice","website":"https://example.com","bio":"Hello world"}}'"#
     );
     println!();
     println!("============================================================");
