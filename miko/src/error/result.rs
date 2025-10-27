@@ -7,16 +7,30 @@ use super::AppError;
 /// # 示例
 ///
 /// ```no_run
-/// use miko::error::AppResult;
+/// use miko::error::{AppError, AppResult};
 /// use miko::extractor::Json;
+/// use serde::{Deserialize, Serialize};
 ///
-/// async fn create_user(data: Json<UserData>) -> AppResult<Json<User>> {
-///     // 验证
+/// // Define request and response structures
+/// #[derive(Deserialize)]
+/// struct UserData {
+///     email: String,
+/// }
+/// 
+/// #[derive(Serialize)]
+/// struct User {
+///     id: u64,
+///     email: String,
+/// }
+///
+/// async fn create_user(Json(data): Json<UserData>) -> AppResult<Json<User>> {
+///     // Validation
 ///     if data.email.is_empty() {
 ///         return Err(AppError::BadRequest("Email is required".to_string()));
 ///     }
 ///     
-///     // 业务逻辑...
+///     // Business logic...
+///     let user = User { id: 1, email: data.email.clone() };
 ///     Ok(Json(user))
 /// }
 /// ```

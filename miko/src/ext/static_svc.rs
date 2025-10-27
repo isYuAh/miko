@@ -253,7 +253,7 @@ impl StaticSvcBuilder {
     /// 
     /// # 示例
     /// ```no_run
-    /// # use miko::ext::StaticSvc;
+    /// # use miko::ext::static_svc::StaticSvc;
     /// StaticSvc::builder("./dist")
     ///     .with_spa_fallback(true)
     ///     .with_fallback_files(vec!["index.html", "app.html", "404.html"])
@@ -267,7 +267,7 @@ impl StaticSvcBuilder {
     /// 
     /// # 示例
     /// ```no_run
-    /// # use miko::ext::StaticSvc;
+    /// # use miko::ext::static_svc::StaticSvc;
     /// StaticSvc::builder("./public")
     ///     .with_index_files(vec!["index.html", "index.htm", "default.html"])
     ///     .build();
