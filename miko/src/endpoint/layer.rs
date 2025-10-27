@@ -1,5 +1,5 @@
 use crate::extractor::from_request::FromRequest;
-use crate::handler::handler::{FnOnceTuple, Req, Resp, TypedHandler, handler_to_svc};
+use crate::handler::handler::{FnOnceTuple, Req, TypedHandler, handler_to_svc};
 use crate::http::response::into_response::IntoResponse;
 use crate::router::HttpSvc;
 use std::convert::Infallible;
