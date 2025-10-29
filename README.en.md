@@ -257,20 +257,18 @@ async fn create_user(
 }
 ```
 
-## 🌟 Example Projects
+## 🌟 Example
 
-Check the `miko/examples/` directory for more examples:
+The `miko/examples/` directory contains a comprehensive `all-in-one` example:
 
-- `demo.rs` - Full feature demonstration
-- `error_handling.rs` - Error handling example
-- `validation_test.rs` - Data validation example
-- `utoipa_demo.rs` - OpenAPI documentation example
-- `layer_test.rs` - Middleware usage example
+- **[basic.rs](./miko/examples/basic.rs)**
 
-Run an example:
+This example covers most of the framework's core features, including routing, middleware, dependency injection, WebSockets, file uploads, and more. It is highly recommended to check this file to quickly understand how to use Miko.
+
+To run the example:
 
 ```bash
-cargo run --example demo --features full
+cargo run --example basic --features full
 ```
 
 ## 🤝 Contributing

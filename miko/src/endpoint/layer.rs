@@ -64,7 +64,7 @@ pub trait LayerExt<Svc>: Sized {
 
 /// 给handler应用state
 pub trait WithState<S>: Sized {
-    fn with_state<A, Fut, R, M>(self, state: Arc<S>) -> HttpSvc<Req>
+    fn with_state<A, Fut, R, M>(self, state: S) -> HttpSvc<Req>
     where
         Self: FnOnceTuple<A, Output = Fut> + Clone + Send + Sync + 'static,
         A: FromRequest<S, M> + Send + 'static,
@@ -95,7 +95,7 @@ impl<F, S> WithState<S> for F
 where
     S: Send + Sync + 'static,
 {
-    fn with_state<A, Fut, R, M>(self, state: Arc<S>) -> HttpSvc<Req>
+    fn with_state<A, Fut, R, M>(self, state: S) -> HttpSvc<Req>
     where
         F: FnOnceTuple<A, Output = Fut> + Clone + Send + Sync + 'static,
         A: FromRequest<S, M> + Send + 'static,
@@ -103,7 +103,7 @@ where
         R: IntoResponse,
         M: Send + Sync + 'static,
     {
-        let handler_arc = Arc::new(TypedHandler::new(self, state));
+        let handler_arc = Arc::new(TypedHandler::new(self, Arc::new(state)));
         handler_to_svc(handler_arc)
     }
 }

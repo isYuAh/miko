@@ -256,20 +256,18 @@ async fn create_user(
 }
 ```
 
-## 🌟 示例项目
+## 🌟 示例
 
-查看 `miko/examples/` 目录获取更多示例：
+`miko/examples/` 目录中提供了一个功能全面的 `all-in-one` 示例：
 
-- `demo.rs` - 完整功能演示
-- `error_handling.rs` - 错误处理示例
-- `validation_test.rs` - 数据验证示例
-- `utoipa_demo.rs` - OpenAPI 文档示例
-- `layer_test.rs` - 中间件使用示例
+- **[basic.rs](./miko/examples/basic.rs)**
 
-运行示例：
+该示例覆盖了框架的绝大多数核心功能，包括路由、中间件、依赖注入、WebSocket、文件上传等。强烈建议通过此文件来快速了解 Miko 的用法。
+
+运行该示例：
 
 ```bash
-cargo run --example demo --features full
+cargo run --example basic --features full
 ```
 
 ## 🤝 贡献

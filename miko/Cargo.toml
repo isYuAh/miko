@@ -49,32 +49,7 @@ utoipa = ["miko-macros/utoipa", "dep:utoipa"]
 validation = ["garde"]
 
 [[example]]
-name = "demo"
-required-features = ["full"]
-
-[[example]]
-name = "error_handling"
-required-features = ["full"]
-
-[[example]]
-name = "utoipa_demo"
-required-features = ["full"]
-
-[[example]]
-name = "utoipa_test"
-required-features = ["full"]
-
-[[example]]
-name = "validation_test"
-required-features = ["full"]
-
-[[example]]
-name = "layer_test"
-required-features = ["full"]
-
-[[example]]
-name = "prefix_test"
-required-features = ["full"]
+name = "basic"
 
 [dev-dependencies]
 utoipa-scalar = { version = "0.2", features = ["axum"] }
