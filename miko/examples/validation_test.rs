@@ -1,14 +1,14 @@
+use miko::extractor::{Json, ValidatedJson};
 /// ValidatedJson 验证测试
 ///
 /// 使用 miko 宏和自动路由注册测试 garde 验证
 ///
 /// 运行: cargo run --example validation_test --features full
 use miko::garde::Validate;
-use miko::extractor::{Json, ValidatedJson};
+use miko::utoipa::ToSchema;
 use miko::*;
 use miko_macros::*;
 use serde::{Deserialize, Serialize};
-use miko::utoipa::ToSchema;
 
 /// 用户注册请求 - 带验证
 #[derive(Debug, Deserialize, Validate, ToSchema)]

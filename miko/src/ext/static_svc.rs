@@ -43,20 +43,21 @@ impl StaticSvc {
     }
 
     async fn resolve_index_file(&self, path: PathBuf) -> Option<PathBuf> {
-        if let Ok(metadata) = tokio::fs::metadata(&path).await {
-            if metadata.is_dir() {
-                for index_file in self.index_files.iter() {
-                    let index_path = path.join(index_file);
-                    if tokio::fs::metadata(&index_path).await.is_ok() {
-                        return Some(index_path);
-                    }
+        if let Ok(metadata) = tokio::fs::metadata(&path).await
+            && metadata.is_dir()
+        {
+            for index_file in self.index_files.iter() {
+                let index_path = path.join(index_file);
+                if tokio::fs::metadata(&index_path).await.is_ok() {
+                    return Some(index_path);
                 }
             }
         }
+
         None
     }
 
-    async fn try_fallback_files(&self, root: &PathBuf) -> Option<PathBuf> {
+    async fn try_fallback_files(&self, root: &Path) -> Option<PathBuf> {
         for fallback_file in self.fallback_files.iter() {
             let fallback_path = root.join(fallback_file);
             if tokio::fs::metadata(&fallback_path).await.is_ok() {
@@ -74,14 +75,14 @@ impl StaticSvc {
         if !range_header.starts_with("bytes=") {
             return Ok(None);
         }
-        
+
         let range_str = &range_header[6..];
-        
+
         // 暂不支持多范围请求 (如 bytes=0-99,200-299)
         if range_str.contains(',') {
             return Ok(None);
         }
-        
+
         let parts: Vec<&str> = range_str.split('-').collect();
         if parts.len() != 2 {
             return Ok(None);
@@ -114,11 +115,15 @@ impl StaticSvc {
         if start <= end {
             Ok(Some((start, end)))
         } else {
-            Err(())  // start > end，无效范围
+            Err(()) // start > end，无效范围
         }
     }
 
-    async fn serve_file(path: &PathBuf, method: &Method, req: &Req) -> Result<Resp, std::io::Error> {
+    async fn serve_file(
+        path: &PathBuf,
+        method: &Method,
+        req: &Req,
+    ) -> Result<Resp, std::io::Error> {
         let mime = mime_guess::from_path(path).first_or_octet_stream();
         let content_type = if mime.type_() == mime_guess::mime::TEXT {
             format!("{}; charset=utf-8", mime)
@@ -141,16 +146,15 @@ impl StaticSvc {
             format!("\"{:x}\"", file_size)
         };
 
-        if let Some(if_none_match) = req.headers().get(header::IF_NONE_MATCH) {
-            if let Ok(if_none_match_str) = if_none_match.to_str() {
-                if if_none_match_str == etag || if_none_match_str == "*" {
-                    return Ok(Response::builder()
-                        .status(StatusCode::NOT_MODIFIED)
-                        .header(header::ETAG, etag)
-                        .body(miko_core::fast_builder::box_empty_body())
-                        .unwrap());
-                }
-            }
+        if let Some(if_none_match) = req.headers().get(header::IF_NONE_MATCH)
+            && let Ok(if_none_match_str) = if_none_match.to_str()
+            && (if_none_match_str == etag || if_none_match_str == "*")
+        {
+            return Ok(Response::builder()
+                .status(StatusCode::NOT_MODIFIED)
+                .header(header::ETAG, etag)
+                .body(miko_core::fast_builder::box_empty_body())
+                .unwrap());
         }
 
         let mut builder = Response::builder()
@@ -164,46 +168,46 @@ impl StaticSvc {
         }
 
         // 处理 Range 请求
-        if let Some(range_header) = req.headers().get(header::RANGE) {
-            if let Ok(range_str) = range_header.to_str() {
-                match Self::parse_range(range_str, file_size) {
-                    Ok(Some((start, end))) => {
-                        // 合法的 Range 请求
-                        let content_length = end - start + 1;
-                        let mut file = File::open(path).await?;
-                        file.seek(SeekFrom::Start(start)).await?;
-                        
-                        builder = builder
-                            .status(StatusCode::PARTIAL_CONTENT)
-                            .header(header::CONTENT_LENGTH, content_length)
-                            .header(
-                                header::CONTENT_RANGE,
-                                format!("bytes {}-{}/{}", start, end, file_size),
-                            );
+        if let Some(range_header) = req.headers().get(header::RANGE)
+            && let Ok(range_str) = range_header.to_str()
+        {
+            match Self::parse_range(range_str, file_size) {
+                Ok(Some((start, end))) => {
+                    // 合法的 Range 请求
+                    let content_length = end - start + 1;
+                    let mut file = File::open(path).await?;
+                    file.seek(SeekFrom::Start(start)).await?;
 
-                        if method == Method::HEAD {
-                            return Ok(builder
-                                .body(miko_core::fast_builder::box_empty_body())
-                                .unwrap());
-                        }
+                    builder = builder
+                        .status(StatusCode::PARTIAL_CONTENT)
+                        .header(header::CONTENT_LENGTH, content_length)
+                        .header(
+                            header::CONTENT_RANGE,
+                            format!("bytes {}-{}/{}", start, end, file_size),
+                        );
 
-                        // 使用 ReaderStream 读取指定范围的数据
-                        let limited_file = file.take(content_length);
-                        let stream = ReaderStream::new(limited_file);
-                        let body = FallibleStreamBody::with_size_hint(stream, content_length);
-                        return Ok(builder.body(body.boxed()).unwrap());
-                    }
-                    Err(()) => {
-                        // Range 超出范围，返回 416 Range Not Satisfiable
-                        return Ok(Response::builder()
-                            .status(StatusCode::RANGE_NOT_SATISFIABLE)
-                            .header(header::CONTENT_RANGE, format!("bytes */{}", file_size))
+                    if method == Method::HEAD {
+                        return Ok(builder
                             .body(miko_core::fast_builder::box_empty_body())
                             .unwrap());
                     }
-                    Ok(None) => {
-                        // 无效的 Range 格式或不支持的格式，忽略 Range 头，返回完整文件
-                    }
+
+                    // 使用 ReaderStream 读取指定范围的数据
+                    let limited_file = file.take(content_length);
+                    let stream = ReaderStream::new(limited_file);
+                    let body = FallibleStreamBody::with_size_hint(stream, content_length);
+                    return Ok(builder.body(body.boxed()).unwrap());
+                }
+                Err(()) => {
+                    // Range 超出范围，返回 416 Range Not Satisfiable
+                    return Ok(Response::builder()
+                        .status(StatusCode::RANGE_NOT_SATISFIABLE)
+                        .header(header::CONTENT_RANGE, format!("bytes */{}", file_size))
+                        .body(miko_core::fast_builder::box_empty_body())
+                        .unwrap());
+                }
+                Ok(None) => {
+                    // 无效的 Range 格式或不支持的格式，忽略 Range 头，返回完整文件
                 }
             }
         }
@@ -250,7 +254,7 @@ impl StaticSvcBuilder {
         self
     }
     /// 自定义 SPA 回退文件列表（按顺序尝试）
-    /// 
+    ///
     /// # 示例
     /// ```no_run
     /// # use miko::ext::static_svc::StaticSvc;
@@ -259,12 +263,15 @@ impl StaticSvcBuilder {
     ///     .with_fallback_files(vec!["index.html", "app.html", "404.html"])
     ///     .build();
     /// ```
-    pub fn with_fallback_files(mut self, files: impl IntoIterator<Item = impl Into<String>>) -> Self {
+    pub fn with_fallback_files(
+        mut self,
+        files: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
         self.fallback_files = files.into_iter().map(|f| f.into()).collect();
         self
     }
     /// 配置目录索引文件列表（当访问目录时按顺序尝试）
-    /// 
+    ///
     /// # 示例
     /// ```no_run
     /// # use miko::ext::static_svc::StaticSvc;
@@ -314,7 +321,7 @@ impl Service<Req> for StaticSvc {
         let root = self.root.clone();
         let spa_fallback = self.spa_fallback;
         let mut path = self.resolve_path(req.uri().path());
-        
+
         let self_clone = self.clone();
         Box::pin(async move {
             if let Some(index_path) = self_clone.resolve_index_file(path.clone()).await {
@@ -324,14 +331,15 @@ impl Service<Req> for StaticSvc {
             match StaticSvc::serve_file(&path, req.method(), &req).await {
                 Ok(resp) => Ok(resp),
                 Err(e) => {
-                    if spa_fallback && e.kind() == std::io::ErrorKind::NotFound {
-                        if let Some(fallback_path) = self_clone.try_fallback_files(&root).await {
-                            match StaticSvc::serve_file(&fallback_path, req.method(), &req).await {
-                                Ok(resp) => return Ok(resp),
-                                Err(_) => {}
-                            }
-                        }
+                    if spa_fallback
+                        && e.kind() == std::io::ErrorKind::NotFound
+                        && let Some(fallback_path) = self_clone.try_fallback_files(&root).await
+                        && let Ok(resp) =
+                            StaticSvc::serve_file(&fallback_path, req.method(), &req).await
+                    {
+                        return Ok(resp);
                     }
+
                     Ok(crate::AppError::NotFound("File not found".to_string()).into_response())
                 }
             }

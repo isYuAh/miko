@@ -16,7 +16,7 @@ use super::AppError;
 /// struct UserData {
 ///     email: String,
 /// }
-/// 
+///
 /// #[derive(Serialize)]
 /// struct User {
 ///     id: u64,
@@ -28,7 +28,7 @@ use super::AppError;
 ///     if data.email.is_empty() {
 ///         return Err(AppError::BadRequest("Email is required".to_string()));
 ///     }
-///     
+///
 ///     // Business logic...
 ///     let user = User { id: 1, email: data.email.clone() };
 ///     Ok(Json(user))

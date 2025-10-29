@@ -1,5 +1,5 @@
 use crate::extractor::path_params::PathParams;
-use crate::handler::handler::{Req, Resp};
+use crate::handler::{Req, Resp};
 use hyper::http::uri::PathAndQuery;
 use hyper::{Request, Uri};
 use std::convert::Infallible;
@@ -59,11 +59,12 @@ where
 
             // 偏移 PathParams
             let (new_uri, pcount) = strip_prefix_preserve_query(&parts.uri, &prefix);
-            if pcount > 0 {
-                if let Some(pp) = parts.extensions.remove::<PathParams>() {
-                    parts.extensions.insert(pp.shift_count(pcount));
-                }
+            if pcount > 0
+                && let Some(pp) = parts.extensions.remove::<PathParams>()
+            {
+                parts.extensions.insert(pp.shift_count(pcount));
             }
+
             parts.uri = new_uri;
 
             let req2 = Request::from_parts(parts, body);

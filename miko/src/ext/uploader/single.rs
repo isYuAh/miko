@@ -1,7 +1,7 @@
 use crate::ext::uploader::{FileField, UploadedFile};
 use crate::extractor::from_request::FromRequest;
 use crate::extractor::multipart::Multipart;
-use crate::handler::handler::Req;
+use crate::handler::Req;
 use crate::http::response::into_response::IntoResponse;
 use hyper::StatusCode;
 use miko_core::Resp;
@@ -50,7 +50,7 @@ where
                     if field.file_name().is_some() {
                         ffield = Some(FileField {
                             original_filename: field.file_name().unwrap_or("").to_string(),
-                            content_type: field.content_type().map(|s| s.clone()),
+                            content_type: field.content_type().cloned(),
                             field,
                         });
                         break;

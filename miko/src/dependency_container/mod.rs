@@ -9,21 +9,24 @@ use tokio::sync::{RwLock, RwLockReadGuard};
 #[cfg(feature = "auto")]
 pub static CONTAINER: OnceCell<Arc<RwLock<LazyDependencyContainer>>> = OnceCell::const_new();
 
+type DependencyInstanceFuture = Pin<Box<dyn Future<Output = DependencyInstance> + Send>>;
+type DependencyInstance = Arc<dyn Any + Send + Sync>;
+
 pub struct DependencyDefFn(pub fn() -> DependencyDef);
 pub struct DependencyDef {
     pub type_id: TypeId,
     pub prewarm: bool,
     pub name: &'static str,
-    pub init_fn: fn() -> Pin<Box<dyn Future<Output = Arc<dyn Any + Send + Sync>> + Send>>,
+    pub init_fn: fn() -> DependencyInstanceFuture,
 }
 #[cfg(feature = "auto")]
 inventory::collect!(DependencyDefFn);
 
-type FactoryFuture = Pin<Box<dyn Future<Output = Arc<dyn Any + Send + Sync>> + Send>>;
+type FactoryFuture = Pin<Box<dyn Future<Output = DependencyInstance> + Send>>;
 pub struct LazyDependencyContainer {
     pub registry: HashMap<(TypeId, &'static str), fn() -> FactoryFuture>,
     pub prewarm_flags: HashMap<(TypeId, &'static str), bool>,
-    pub instances: HashMap<(TypeId, &'static str), Arc<OnceCell<Arc<dyn Any + Send + Sync>>>>,
+    pub instances: HashMap<(TypeId, &'static str), Arc<OnceCell<DependencyInstance>>>,
 }
 impl LazyDependencyContainer {
     pub fn new() -> Self {
@@ -87,7 +90,7 @@ impl LazyDependencyContainer {
             .instances
             .get(&(TypeId::of::<T>(), name))
             .expect("No instance cell found for type");
-        let instance = instance.get_or_init(|| init_fn()).await.clone();
+        let instance = instance.get_or_init(init_fn).await.clone();
         instance.downcast_arc::<T>().unwrap()
     }
     pub async fn get<T: 'static + Send + Sync>(&self) -> Arc<T> {
@@ -99,7 +102,7 @@ impl LazyDependencyContainer {
             .instances
             .get(&(TypeId::of::<T>(), "___"))
             .expect("No instance cell found for type");
-        let instance = instance.get_or_init(|| init_fn()).await.clone();
+        let instance = instance.get_or_init(init_fn).await.clone();
         instance.downcast_arc::<T>().unwrap()
     }
 
@@ -108,7 +111,7 @@ impl LazyDependencyContainer {
             if *prewarm {
                 let init_fn = self.registry.get(type_id).unwrap();
                 let cell = self.instances.get(type_id).unwrap();
-                let _ = cell.get_or_init(|| init_fn()).await;
+                let _ = cell.get_or_init(init_fn).await;
             }
         }
     }

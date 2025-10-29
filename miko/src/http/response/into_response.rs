@@ -1,5 +1,5 @@
 use crate::extractor::Json;
-use crate::handler::handler::{Resp, RespBody};
+use crate::handler::{Resp, RespBody};
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http_body_util::{BodyExt, Full, StreamBody};

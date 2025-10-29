@@ -12,7 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 thread_local! {
     /// 用于存储当前请求的 trace_id
-    static TRACE_ID: RefCell<Option<String>> = RefCell::new(None);
+    static TRACE_ID: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
 /// 设置当前请求的 trace_id

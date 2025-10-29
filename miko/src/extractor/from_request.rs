@@ -3,8 +3,8 @@ use hyper::HeaderMap;
 use hyper::http::request::Parts;
 use std::sync::Arc;
 
-use crate::handler::handler::Req;
-use crate::handler::handler::{PartsTag, ReqTag};
+use crate::handler::Req;
+use crate::handler::{PartsTag, ReqTag};
 
 /// FromRequest 返回值的异步类型别名（拥有请求体）
 pub type FRFut<T> = std::pin::Pin<Box<dyn Future<Output = Result<T, AppError>> + Send + 'static>>;

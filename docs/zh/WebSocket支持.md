@@ -17,14 +17,14 @@ async fn websocket_handler(mut req: Req) {
         |mut io| async move {
             // 发送欢迎消息
             io.send("Connected!").await.expect("send failed");
-            
+
             // 循环接收和发送消息
             while let Some(msg) = io.recv().await {
                 match msg {
                     Ok(message) if message.is_text() => {
                         let text = message.into_text().unwrap();
                         println!("Received: {}", text);
-                        
+
                         // 回显消息
                         io.send(format!("Echo: {}", text))
                             .await
@@ -61,10 +61,10 @@ async fn chat_ws(mut req: Req) {
         |mut io| async move {
             // 文本消息
             io.send("Hello").await.unwrap();
-            
+
             // 格式化消息
             io.send(format!("Time: {}", get_time())).await.unwrap();
-            
+
             // JSON 消息
             io.send(Json(MyData { value: 42 })).await.unwrap();
         },
@@ -119,9 +119,9 @@ async fn split_ws(mut req: Req) {
     spawn_ws_event(
         |mut io| async move {
             io.send("Starting...").await.unwrap();
-            
+
             let (mut writer, mut reader, _handle) = io.split();
-            
+
             // 发送任务
             {
                 let mut w = writer.clone();
@@ -132,7 +132,7 @@ async fn split_ws(mut req: Req) {
                     }
                 });
             }
-            
+
             // 接收任务
             tokio::spawn(async move {
                 while let Some(msg) = reader.next().await {
@@ -166,15 +166,15 @@ async fn time_ws(mut req: Req) {
     spawn_ws_event(
         |mut io| async move {
             io.send("Time service started").await.unwrap();
-            
+
             loop {
                 tokio::time::sleep(Duration::from_secs(1)).await;
-                
+
                 let now = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
                     .as_secs();
-                
+
                 if io.send(format!("Server time: {}", now)).await.is_err() {
                     break;  // 客户端断开
                 }

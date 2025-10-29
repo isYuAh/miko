@@ -52,7 +52,7 @@ async fn hello() -> &'static str {
 async fn main() {
     let router = Router::new()
         .get("/", hello);
-    
+
     Application::new_(router).run().await.unwrap();
 }
 ```
@@ -120,7 +120,7 @@ async fn main() {
         .post("/users", create_user)
         .get("/users/{id}", get_user)
         .get("/search", search);
-    
+
     Application::new_(router).run().await.unwrap();
 }
 ```
@@ -173,7 +173,7 @@ miko = { version = "0.3", features = ["utoipa", "validation"] }
 // 启用 utoipa feature 后，直接使用
 use miko::{OpenApi, ToSchema};
 
-// 启用 validation feature 后，直接使用  
+// 启用 validation feature 后，直接使用
 use miko::{Validate};
 ```
 
@@ -251,7 +251,7 @@ use garde::Validate;
 struct CreateUser {
     #[garde(length(min = 3, max = 50))]
     name: String,
-    
+
     #[garde(contains("@"))]
     email: String,
 }

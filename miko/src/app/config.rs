@@ -103,7 +103,7 @@ pub fn load_config_section<T: DeserializeOwned>(section: &str) -> Result<T, Erro
     section_value
         .clone()
         .try_into()
-        .map_err(|e| anyhow!("Failed to deserialize section '[{}]': {:?}", section, e).into())
+        .map_err(|e| anyhow!("Failed to deserialize section '[{}]': {:?}", section, e))
 }
 
 /// 从一个 toml::Value 开始，按路径（如 a.b.c）获取子值

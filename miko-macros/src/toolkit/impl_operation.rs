@@ -12,10 +12,10 @@ use syn::{FnArg, ImplItem, ImplItemFn, Pat, PatIdent};
 /// 用于在宏中检测并提取异步构造函数以进行依赖注入分析。
 pub fn get_constructor(items: &Vec<ImplItem>) -> Option<&ImplItemFn> {
     for item in items {
-        if let ImplItem::Fn(method) = item {
-            if method.sig.ident == "new" {
-                return Some(method);
-            }
+        if let ImplItem::Fn(method) = item
+            && method.sig.ident == "new"
+        {
+            return Some(method);
         }
     }
     None
@@ -38,7 +38,7 @@ pub fn inject_deps(
                     panic!("service method new argument must be Typed")
                 }
             };
-            let (is_arc, inner) = is_arc(&*pat.ty);
+            let (is_arc, inner) = is_arc(&pat.ty);
             if !is_arc {
                 panic!("service method new argument must be Arc<T>")
             }

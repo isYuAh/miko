@@ -69,9 +69,9 @@ pub fn build_register_expr(ra: &RouteAttr, fn_name: &Ident, layers: &[LayerAttr]
             stmts.push(quote! {
                 {
                     let __handler = #fn_name;
-                    let __svc = ::miko::handler::handler::handler_to_svc(
+                    let __svc = ::miko::handler::handler_to_svc(
                         ::std::sync::Arc::new(
-                            ::miko::handler::handler::TypedHandler::new(__handler, ::std::sync::Arc::new(()))
+                            ::miko::handler::TypedHandler::new(__handler, ::std::sync::Arc::new(()))
                         )
                     );
                     #(

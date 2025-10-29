@@ -1,5 +1,5 @@
 use crate::extractor::from_request::FromRequest;
-use crate::handler::handler::{FnOnceTuple, Req, TypedHandler, handler_to_svc};
+use crate::handler::{FnOnceTuple, Req, TypedHandler, handler_to_svc};
 use crate::http::response::into_response::IntoResponse;
 use crate::router::HttpSvc;
 use std::convert::Infallible;
@@ -15,11 +15,11 @@ use tower::{Layer, Service, ServiceExt, util::BoxCloneService};
 /// use miko::endpoint::LayerExt;
 /// use tower_http::timeout::TimeoutLayer;
 /// use std::time::Duration;
-/// use miko::handler::handler::{handler_to_svc, HttpSvc};
+/// use miko::handler::{handler_to_svc, HttpSvc};
 /// use std::sync::Arc;
 /// use tower_http::compression::CompressionLayer;
-/// use miko::handler::handler::TypedHandler;
-/// 
+/// use miko::handler::TypedHandler;
+///
 /// async fn my_handler() -> String {
 ///     "Hello".to_string()
 /// }

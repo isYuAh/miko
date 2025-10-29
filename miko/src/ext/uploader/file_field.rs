@@ -36,7 +36,7 @@ impl FileField {
     /// 从 multer::Field 构建 FileField
     pub fn from(field: Field<'static>) -> Self {
         let filename = field.file_name().map(|s| s.to_string()).unwrap_or_default();
-        let content_type = field.content_type().map(|v| v.clone());
+        let content_type = field.content_type().cloned();
         Self {
             original_filename: filename,
             content_type,
@@ -62,12 +62,12 @@ impl FileField {
             let chunk = chunk?;
             size += chunk.len();
             dest_file.write_all(&chunk).await?;
-            if let Some(max_size) = config.max_size {
-                if size > max_size {
-                    dest_file.shutdown().await?;
-                    tokio::fs::remove_file(&dest).await?;
-                    return Err(anyhow::anyhow!("File size exceeded"));
-                }
+            if let Some(max_size) = config.max_size
+                && size > max_size
+            {
+                dest_file.shutdown().await?;
+                tokio::fs::remove_file(&dest).await?;
+                return Err(anyhow::anyhow!("File size exceeded"));
             }
         }
         Ok(UploadedFile {
@@ -79,12 +79,8 @@ impl FileField {
     }
 }
 
+#[derive(Default)]
 /// 文件保存时的简单限制配置（如最大尺寸）
 pub struct FileTransferConfig {
     pub max_size: Option<usize>,
-}
-impl Default for FileTransferConfig {
-    fn default() -> Self {
-        Self { max_size: None }
-    }
 }

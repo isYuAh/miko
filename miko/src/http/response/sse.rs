@@ -1,5 +1,5 @@
 use crate::extractor::Json;
-use crate::handler::handler::Resp;
+use crate::handler::Resp;
 use crate::http::response::into_response::{IntoResponse, SSE};
 use bytes::Bytes;
 use futures::StreamExt;
@@ -86,7 +86,7 @@ impl SseEvent {
         if let Some(retry) = self.retry {
             buf.push_str(&format!("retry: {}\n", retry));
         }
-        buf.push_str("\n");
+        buf.push('\n');
         Bytes::from(buf)
     }
 }

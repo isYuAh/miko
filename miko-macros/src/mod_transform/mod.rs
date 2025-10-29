@@ -64,29 +64,29 @@ fn apply_transform_to_fn(func: &mut ItemFn, op: &TransformOp) {
             for attr in &mut func.attrs {
                 if let Some(ident) = attr.path().get_ident() {
                     let attr_name = ident.to_string();
-                    if ROUTE_MACROS.contains(&attr_name.as_str()) {
-                        if let Ok(mut attr_map) = attr.parse_args::<StrAttrMap>() {
-                            let original_path = attr_map
-                                .get_or_default("path")
-                                .or_else(|| attr_map.default.clone())
-                                .unwrap_or_default();
-                            let new_path = if original_path.is_empty() {
-                                prefix.clone()
-                            } else {
-                                format!("{}{}", prefix, original_path)
-                            };
-                            if attr_map.map.contains_key("path") {
-                                attr_map.map.insert("path".to_string(), new_path);
-                            } else if attr_map.default.is_some() {
-                                attr_map.default = Some(new_path);
-                            }
-
-                            let new_tokens = attr_map.to_token_stream();
-                            let path = attr.path();
-                            *attr = syn::parse_quote! {
-                                #[#path(#new_tokens)]
-                            };
+                    if ROUTE_MACROS.contains(&attr_name.as_str())
+                        && let Ok(mut attr_map) = attr.parse_args::<StrAttrMap>()
+                    {
+                        let original_path = attr_map
+                            .get_or_default("path")
+                            .or_else(|| attr_map.default.clone())
+                            .unwrap_or_default();
+                        let new_path = if original_path.is_empty() {
+                            prefix.clone()
+                        } else {
+                            format!("{}{}", prefix, original_path)
+                        };
+                        if attr_map.map.contains_key("path") {
+                            attr_map.map.insert("path".to_string(), new_path);
+                        } else if attr_map.default.is_some() {
+                            attr_map.default = Some(new_path);
                         }
+
+                        let new_tokens = attr_map.to_token_stream();
+                        let path = attr.path();
+                        *attr = syn::parse_quote! {
+                            #[#path(#new_tokens)]
+                        };
                     }
                 }
             }

@@ -36,48 +36,45 @@ impl RouteFnArg {
         let mut out = Vec::new();
         for input in inputs {
             let input_clone = input.clone();
-            match input {
-                FnArg::Typed(pat) => {
-                    let mut mark = HashMap::new();
-                    let ident = match &*pat.pat {
-                        syn::Pat::Ident(pat_ident) => Some(pat_ident.ident.clone()),
-                        syn::Pat::TupleStruct(pat_ts) => {
-                            let mut pat_ts = pat_ts.clone();
-                            while let Some(syn::Pat::TupleStruct(pat_tsn)) = pat_ts.elems.first() {
-                                pat_ts = pat_tsn.clone();
-                            }
-                            if let syn::Pat::Ident(pat_ident) = pat_ts.elems.first().unwrap() {
-                                Some(pat_ident.ident.clone())
-                            } else {
-                                None
-                            }
+            if let FnArg::Typed(pat) = input {
+                let mut mark = HashMap::new();
+                let ident = match &*pat.pat {
+                    syn::Pat::Ident(pat_ident) => Some(pat_ident.ident.clone()),
+                    syn::Pat::TupleStruct(pat_ts) => {
+                        let mut pat_ts = pat_ts.clone();
+                        while let Some(syn::Pat::TupleStruct(pat_tsn)) = pat_ts.elems.first() {
+                            pat_ts = pat_tsn.clone();
                         }
-                        _ => None,
-                    };
-                    let (is_option, _option_ty) = is_option(&pat.ty);
-                    if ident.is_none() {
-                        panic!("RouteFnArg must have an ident");
-                    }
-                    for attr in &pat.attrs {
-                        let mut sam = StrAttrMap::new();
-                        if let Meta::List(list) = &attr.meta {
-                            let tk = list.tokens.clone();
-                            sam = syn::parse2(tk).unwrap();
+                        if let syn::Pat::Ident(pat_ident) = pat_ts.elems.first().unwrap() {
+                            Some(pat_ident.ident.clone())
+                        } else {
+                            None
                         }
-                        let ident_str = attr.path().get_ident().unwrap().to_string();
-                        mark.insert(ident_str, sam);
                     }
-                    let rfa = RouteFnArg {
-                        ident: ident.unwrap(),
-                        ty: *pat.ty.clone(),
-                        is_option,
-                        attrs: vec![],
-                        mark,
-                        origin: input_clone,
-                    };
-                    out.push(rfa);
+                    _ => None,
+                };
+                let (is_option, _option_ty) = is_option(&pat.ty);
+                if ident.is_none() {
+                    panic!("RouteFnArg must have an ident");
                 }
-                _ => {}
+                for attr in &pat.attrs {
+                    let mut sam = StrAttrMap::new();
+                    if let Meta::List(list) = &attr.meta {
+                        let tk = list.tokens.clone();
+                        sam = syn::parse2(tk).unwrap();
+                    }
+                    let ident_str = attr.path().get_ident().unwrap().to_string();
+                    mark.insert(ident_str, sam);
+                }
+                let rfa = RouteFnArg {
+                    ident: ident.unwrap(),
+                    ty: *pat.ty.clone(),
+                    is_option,
+                    attrs: vec![],
+                    mark,
+                    origin: input_clone,
+                };
+                out.push(rfa);
             }
         }
         out
@@ -198,13 +195,11 @@ pub fn build_config_value_injector(
         if let Some(item) = mark_item {
             if let Some(path) = item.get_or_default("path") {
                 let (is_option, inner) = is_option(&rfa.ty);
-                let parse_expr;
-                if is_option {
-                    parse_expr =
-                        prase_expr_by_type(&inner.unwrap(), path, rfa.ident.clone(), false);
+                let parse_expr = if is_option {
+                    parse_expr_by_type(&inner.unwrap(), path, rfa.ident.clone(), false)
                 } else {
-                    parse_expr = prase_expr_by_type(&rfa.ty, path, rfa.ident.clone(), true);
-                }
+                    parse_expr_by_type(&rfa.ty, path, rfa.ident.clone(), true)
+                };
                 config_value_stmts.push(parse_expr);
             } else {
                 panic!("config param must be like #[config(\"xx\")] or #[config(path=\"xx\")] ");
@@ -213,7 +208,7 @@ pub fn build_config_value_injector(
     }
 }
 
-fn prase_expr_by_type(ty: &Type, path: String, ident: syn::Ident, unwrap: bool) -> TokenStream {
+fn parse_expr_by_type(ty: &Type, path: String, ident: syn::Ident, unwrap: bool) -> TokenStream {
     if unwrap {
         quote! {
             let #ident = ::miko::app::config::get_config_value(#path)

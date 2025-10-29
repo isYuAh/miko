@@ -30,7 +30,7 @@ pub fn build_struct_from_query(
             })
         }
     }
-    if fields.len() > 0 {
+    if !fields.is_empty() {
         // 根据是否启用 utoipa feature 决定是否派生 IntoParams
         #[cfg(feature = "utoipa")]
         let derives = quote! {
