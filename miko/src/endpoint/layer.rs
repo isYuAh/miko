@@ -2,6 +2,10 @@ use crate::extractor::from_request::FromRequest;
 use crate::handler::{FnOnceTuple, Req, TypedHandler, handler_to_svc};
 use crate::http::response::into_response::IntoResponse;
 use crate::router::HttpSvc;
+use bytes::Bytes;
+use http_body::Body;
+use http_body_util::BodyExt;
+use hyper::Response;
 use std::convert::Infallible;
 use std::future::Future;
 use std::sync::Arc;
@@ -32,23 +36,25 @@ use tower::{Layer, Service, ServiceExt, util::BoxCloneService};
 /// // 使用 xxx_service 方法注册
 /// router.get_service("/api/users", endpoint);
 /// ```
-pub trait LayerExt: Sized {
+pub trait LayerExt<Svc>: Sized {
     /// 为当前 handler 或 service 应用一个 layer，返回包装后的 Service
-    fn layer<L>(self, layer: L) -> HttpSvc<Req>
+    fn layer<L, B>(self, layer: L) -> HttpSvc<Req>
     where
-        Self: Service<Req> + Sized,
-        L: Layer<Self> + Send + Sync + 'static,
-        L::Service: Service<Req, Error = Infallible> + Clone + Send + 'static,
-        <L::Service as Service<Req>>::Response: IntoResponse,
+        Svc: Service<Req>,
+        L: Layer<Svc>,
+        L::Service:
+            Service<Req, Response = Response<B>, Error = Infallible> + Clone + Send + 'static,
+        B: Body<Data = Bytes, Error = Infallible> + Send + Sync + 'static,
         <L::Service as Service<Req>>::Future: Send + 'static;
 
     /// 为当前 handler 或 service 应用一个 layer（使用 with_layer 别名）
-    fn with_layer<L>(self, layer: L) -> HttpSvc<Req>
+    fn with_layer<L, B>(self, layer: L) -> HttpSvc<Req>
     where
-        Self: Service<Req> + Sized,
-        L: Layer<Self> + Send + Sync + 'static,
-        L::Service: Service<Req, Error = Infallible> + Clone + Send + 'static,
-        <L::Service as Service<Req>>::Response: IntoResponse,
+        Svc: Service<Req>,
+        L: Layer<Svc>,
+        L::Service:
+            Service<Req, Response = Response<B>, Error = Infallible> + Clone + Send + 'static,
+        B: Body<Data = Bytes, Error = Infallible> + Send + Sync + 'static,
         <L::Service as Service<Req>>::Future: Send + 'static,
     {
         self.layer(layer)
@@ -66,15 +72,20 @@ pub trait WithState<S>: Sized {
         M: Send + Sync + 'static;
 }
 
-impl LayerExt for HttpSvc<Req> {
-    fn layer<L>(self, layer: L) -> HttpSvc<Req>
+impl LayerExt<HttpSvc<Req>> for HttpSvc<Req> {
+    fn layer<L, B>(self, layer: L) -> HttpSvc<Req>
     where
-        L: Layer<Self> + Send + Sync + 'static,
-        L::Service: Service<Req, Error = Infallible> + Clone + Send + 'static,
-        <L::Service as Service<Req>>::Response: IntoResponse,
+        L: Layer<Self>,
+        L::Service:
+            Service<Req, Response = Response<B>, Error = Infallible> + Clone + Send + 'static,
+        B: Body<Data = Bytes, Error = Infallible> + Send + Sync + 'static,
         <L::Service as Service<Req>>::Future: Send + 'static,
     {
-        let layered_svc = layer.layer(self).map_response(IntoResponse::into_response);
+        let layered_svc = layer.layer(self).map_response(|resp| {
+            let (parts, body) = resp.into_parts();
+            let body = body.boxed();
+            Response::from_parts(parts, body)
+        });
         BoxCloneService::new(layered_svc)
     }
 }

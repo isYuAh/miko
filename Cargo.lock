@@ -764,6 +764,7 @@ dependencies = [
  "bytes",
  "futures",
  "garde",
+ "http-body",
  "http-body-util",
  "httpdate",
  "hyper",
