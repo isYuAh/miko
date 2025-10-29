@@ -71,6 +71,7 @@ utoipa-scalar = { version = "0.2", features = ["axum"] }
 
 ```rust
 use miko::*;
+use miko::macros::*;
 
 #[derive(Serialize, Deserialize, ToSchema)]
 struct User {
@@ -122,6 +123,7 @@ async fn get_user(#[path] id: u32) -> Json<User> {
 
 ```rust
 use miko::OpenApi;
+use miko::macros::*;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -214,6 +216,7 @@ async fn create_user(
 
 ```rust
 use miko::*;
+use miko::macros::*;
 use utoipa_scalar::{Scalar, Servable};
 
 // ========== Schemas ==========

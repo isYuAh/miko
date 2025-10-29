@@ -8,7 +8,7 @@
 [![Documentation](https://docs.rs/miko/badge.svg)](https://docs.rs/miko)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[中文文档](docs/zh/README.md)
+[中文](README.md) | [English](README.en.md)
 
 </div>
 
@@ -29,31 +29,23 @@
 
 ### 安装
 
-在 `Cargo.toml` 中添加依赖：
-
-```toml
-[dependencies]
-miko = { version = "0.3.5", features = ["full"] }
-tokio = { version = "1", features = ["full"] }
-serde = { version = "1", features = ["derive"] }
+```bash
+cargo add miko --features=full
 ```
 
 ### Hello World
 
 ```rust
 use miko::*;
+use miko::macros::*;
 
 #[get("/")]
 async fn hello() -> &'static str {
     "Hello, Miko!"
 }
 
-#[tokio::main]
+#[main]
 async fn main() {
-    let router = Router::new()
-        .get("/", hello);
-
-    Application::new_(router).run().await.unwrap();
 }
 ```
 
@@ -62,7 +54,7 @@ async fn main() {
 ### 更多示例
 
 ```rust
-use miko::{*, extractor::{Json, Path, Query}};
+use miko::{*, macros::*, extractor::{Json, Path, Query}};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -148,13 +140,13 @@ Miko 采用模块化设计，你可以按需启用功能：
 ```toml
 [dependencies]
 # 默认启用核心功能（宏、自动注册、扩展功能）
-miko = "0.3"
+miko = "x.x"
 
 # 或启用所有功能，包括 OpenAPI 和数据验证
-miko = { version = "0.3", features = ["full"] }
+miko = { version = "x.x", features = ["full"] }
 
 # 或只启用需要的功能
-miko = { version = "0.3", features = ["utoipa", "validation"] }
+miko = { version = "x.x", features = ["utoipa", "validation"] }
 ```
 
 可用的 features：
@@ -171,10 +163,10 @@ miko = { version = "0.3", features = ["utoipa", "validation"] }
 
 ```rust
 // 启用 utoipa feature 后，直接使用
-use miko::{OpenApi, ToSchema};
+use miko::{utoipa, OpenApi, ToSchema};
 
 // 启用 validation feature 后，直接使用
-use miko::{Validate};
+use miko::{garde, Validate};
 ```
 
 ## 🛠️ 核心组件
@@ -219,7 +211,7 @@ async fn list_users(#[dep] db: Arc<Database>) -> Json<Vec<User>> {
 
 ### OpenAPI 文档
 
-自动生成 API 文档：
+自动生成 API 文档：（只是推断params summary descripion required这些，其他的还需要自己写，比如opanapi的一个结构体，还有paths这种）
 
 ```rust
 use miko::*;
@@ -282,11 +274,7 @@ cargo run --example demo --features full
 
 ## 🤝 贡献
 
-欢迎贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解更多信息。
-
 ## 📄 许可证
-
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
 ## 🔗 相关链接
 

@@ -8,6 +8,7 @@ Miko 提供 WebSocket 支持，可以轻松实现双向实时通信。
 
 ```rust
 use miko::*;
+use miko::macros::*;
 use miko::ws::server::{spawn_ws_event, IntoMessage};
 use std::time::Duration;
 
