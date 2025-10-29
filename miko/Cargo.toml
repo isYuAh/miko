@@ -51,6 +51,14 @@ validation = ["garde"]
 [[example]]
 name = "basic"
 
+[[example]]
+name = "utoipa_demo"
+required-features = ["full"]
+
+[[example]]
+name = "validation_test"
+required-features = ["full"]
+
 [dev-dependencies]
 utoipa-scalar = { version = "0.2", features = ["axum"] }
 tracing-subscriber = "0.3.20"
