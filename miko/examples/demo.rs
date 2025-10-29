@@ -105,6 +105,7 @@ async fn sse_handler(#[config("value.haha.heihei")] v: String, #[dep] service: A
 }
 
 #[get("/test")]
+#[layer(tower_http::compression::CompressionLayer::new())]
 async fn handler(
     headers: HeaderMap,
     Query(params): Query<HashMap<String, String>>,
