@@ -20,9 +20,9 @@ Miko 的路由宏 (`#[get]`, `#[post]` 等) 会自动分析 handler 函数,推�
 
 ```rust
 /// 获取用户信息
-/// 
+///
 /// 根据用户 ID 查询用户详细信息
-#[get("/users/{id}")]  
+#[get("/users/{id}")]
 async fn get_user(
     #[path] id: u32,           // ✅ 自动生成: 参数名 "id", 类型 integer
     #[query] filter: Filter,   // ✅ 自动生成: query 参数结构
@@ -71,15 +71,16 @@ utoipa-scalar = { version = "0.2", features = ["axum"] }
 
 ```rust
 use miko::*;
+use miko::macros::*;
 
 #[derive(Serialize, Deserialize, ToSchema)]
 struct User {
     #[schema(example = 1)]
     id: u32,
-    
+
     #[schema(example = "Alice")]
     name: String,
-    
+
     #[schema(example = "alice@example.com")]
     email: String,
 }
@@ -91,7 +92,7 @@ struct User {
 
 ```rust
 /// 获取用户信息
-/// 
+///
 /// 根据用户 ID 查询并返回用户详细信息
 #[get("/users/{id}")]
 #[u_tag("用户管理")]
@@ -122,6 +123,7 @@ async fn get_user(#[path] id: u32) -> Json<User> {
 
 ```rust
 use miko::OpenApi;
+use miko::macros::*;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -214,6 +216,7 @@ async fn create_user(
 
 ```rust
 use miko::*;
+use miko::macros::*;
 use utoipa_scalar::{Scalar, Servable};
 
 // ========== Schemas ==========
@@ -222,10 +225,10 @@ use utoipa_scalar::{Scalar, Servable};
 struct User {
     #[schema(example = 1)]
     id: u32,
-    
+
     #[schema(example = "Alice")]
     name: String,
-    
+
     #[schema(example = "alice@example.com")]
     email: String,
 }
@@ -234,7 +237,7 @@ struct User {
 struct CreateUser {
     #[schema(example = "Bob", min_length = 3)]
     name: String,
-    
+
     #[schema(example = "bob@example.com")]
     email: String,
 }

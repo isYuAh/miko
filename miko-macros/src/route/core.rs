@@ -42,7 +42,7 @@ pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
     // 自动返回值
     let sig = &mut fn_item.sig;
     if matches!(sig.output, syn::ReturnType::Default) {
-        (*sig).output = parse_quote!(-> impl ::miko::http::response::into_response::IntoResponse)
+        sig.output = parse_quote!(-> impl ::miko::http::response::into_response::IntoResponse)
     }
     let inject_segs: Vec<Stmt> = Vec::new();
     let rfa = RouteFnArg::from_punctuated(&mut sig.inputs);
@@ -81,10 +81,7 @@ pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
     // 组装path
     sig.inputs.extend(path_inputs);
     // 构建 Query 结构体和解构提取器
-    let q_struct_ident = Ident::new(
-        &format!("__{}_QueryStruct", fn_name.to_string()),
-        Span::call_site(),
-    );
+    let q_struct_ident = Ident::new(&format!("__{}_QueryStruct", fn_name), Span::call_site());
     // 重组Query
     let (q_struct, q_struct_exactor) = build_struct_from_query(&rfa, q_struct_ident);
     if q_struct.is_some() {

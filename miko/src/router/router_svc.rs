@@ -1,5 +1,5 @@
 use crate::error::{clear_trace_id, set_trace_id};
-use crate::handler::handler::{Req, Resp};
+use crate::handler::{Req, Resp};
 use crate::router::Router;
 use crate::{AppError, IntoResponse};
 use std::convert::Infallible;
@@ -33,7 +33,7 @@ impl<S: Send + Sync + 'static> Service<Req> for RouterSvc<S> {
     fn call(&mut self, mut req: Req) -> Self::Future {
         let method = req.method().clone();
         let path = req.uri().path().to_string();
-        let result = self.router.find_handler(&method, &path).map(|h| h.clone());
+        let result = self.router.find_handler(&method, &path);
 
         // 自动设置 trace_id
         // 优先从请求头获取,如果没有则生成新的

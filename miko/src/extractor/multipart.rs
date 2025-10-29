@@ -1,5 +1,5 @@
 use crate::extractor::from_request::{FRFut, FromRequest};
-use crate::handler::handler::Req;
+use crate::handler::Req;
 use bytes::Bytes;
 use futures::TryStreamExt;
 use http_body_util::BodyExt;
@@ -45,7 +45,7 @@ pub struct MultipartFileDiskLinker {
 impl MultipartFileDiskLinker {
     /// 将临时文件复制到指定路径
     pub async fn transfer_to(&self, path: impl Into<PathBuf>) -> Result<u64, std::io::Error> {
-        Ok(tokio::fs::copy(self.file_path.clone(), path.into()).await?)
+        tokio::fs::copy(self.file_path.clone(), path.into()).await
     }
     /// 以 UTF-8 读取整个文件内容为字符串
     pub async fn read_to_string(&mut self) -> Result<String, std::io::Error> {
@@ -81,7 +81,7 @@ impl<S> FromRequest<S> for MultipartResult {
                 let name = field.name().unwrap().to_string();
                 if let Some(filename) = field.file_name() {
                     let filename = filename.to_string();
-                    let content_type = field.content_type().map(|ct| ct.clone());
+                    let content_type = field.content_type().cloned();
                     let temp_file = NamedTempFile::new()?;
                     let file_path = temp_file.path().to_path_buf();
                     let mut async_file_writer = File::options()
@@ -89,11 +89,8 @@ impl<S> FromRequest<S> for MultipartResult {
                         .write(true)
                         .open(file_path.clone())
                         .await?;
-                    let mut reader = StreamReader::new(
-                        field
-                            .into_stream()
-                            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
-                    );
+                    let mut reader =
+                        StreamReader::new(field.into_stream().map_err(std::io::Error::other));
                     tokio::io::copy(&mut reader, &mut async_file_writer).await?;
                     let fil = MultipartFile {
                         filename,

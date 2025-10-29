@@ -69,13 +69,26 @@ pub fn build_register_expr(ra: &RouteAttr, fn_name: &Ident, layers: &[LayerAttr]
             stmts.push(quote! {
                 {
                     let __handler = #fn_name;
-                    let __svc = ::miko::handler::handler::handler_to_svc(
+                    let __svc = ::miko::handler::handler_to_svc(
                         ::std::sync::Arc::new(
-                            ::miko::handler::handler::TypedHandler::new(__handler, ::std::sync::Arc::new(()))
+                            ::miko::handler::TypedHandler::new(__handler, ::std::sync::Arc::new(()))
                         )
                     );
                     #(
-                        let __svc = ::tower::Layer::layer(&#layer_exprs, __svc);
+                        let __svc = {
+                            let layered = ::tower::Layer::layer(&#layer_exprs, __svc);
+                            ::tower::ServiceExt::map_response(layered, |resp| {
+                                let (parts, body) = resp.into_parts();
+                                // TODO: This is a temporary solution to pass compilation by assuming the body stream is infallible.
+                                // A real error handling mechanism (e.g., converting the error to a 500 response)
+                                // should be implemented in the future to replace this.
+                                let body = ::http_body_util::BodyExt::map_err(body, |err| {
+                                    unreachable!("Body stream error occurred, but was assumed to be infallible: {}", err)
+                                });
+                                let boxed_body = ::http_body_util::BodyExt::boxed(body);
+                                ::miko::hyper::Response::from_parts(parts, boxed_body)
+                            })
+                        };
                     )*
                     let __boxed = ::tower::util::BoxCloneService::new(__svc);
                     router.#service_method_name(#path, __boxed);

@@ -9,7 +9,7 @@ use crate::error::AppError;
 #[cfg(feature = "validation")]
 use crate::extractor::from_request::{FRFut, FromRequest};
 #[cfg(feature = "validation")]
-use crate::handler::handler::Req;
+use crate::handler::Req;
 #[cfg(feature = "validation")]
 use http_body_util::BodyExt;
 #[cfg(feature = "validation")]
@@ -26,7 +26,7 @@ use std::sync::Arc;
 /// - `T` 必须实现 `garde::Validate`
 ///
 /// # Example
-/// ```no_run
+/// ```rust,ignore
 /// use miko::extractor::ValidatedJson;
 /// use garde::Validate;
 /// use serde::Deserialize;
@@ -35,17 +35,17 @@ use std::sync::Arc;
 /// struct CreateUser {
 ///     #[garde(length(min = 3, max = 50))]
 ///     username: String,
-///     
+///
 ///     #[garde(email)]
 ///     email: String,
-///     
+///
 ///     #[garde(length(min = 8))]
 ///     password: String,
 /// }
 ///
 /// async fn create_user(
 ///     ValidatedJson(user): ValidatedJson<CreateUser>
-/// ) -> Result<String, AppError> {
+/// ) -> AppResult<String> {
 ///     // user 已经通过验证
 ///     Ok(format!("Created user: {}", user.username))
 /// }

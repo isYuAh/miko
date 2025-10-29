@@ -8,7 +8,7 @@
 [![Documentation](https://docs.rs/miko/badge.svg)](https://docs.rs/miko)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[中文文档](docs/zh/README.md)
+[中文](README.md) | [English](README.en.md)
 
 </div>
 
@@ -29,31 +29,23 @@
 
 ### 安装
 
-在 `Cargo.toml` 中添加依赖：
-
-```toml
-[dependencies]
-miko = { version = "0.3.5", features = ["full"] }
-tokio = { version = "1", features = ["full"] }
-serde = { version = "1", features = ["derive"] }
+```bash
+cargo add miko --features=full
 ```
 
 ### Hello World
 
 ```rust
 use miko::*;
+use miko::macros::*;
 
 #[get("/")]
 async fn hello() -> &'static str {
     "Hello, Miko!"
 }
 
-#[tokio::main]
+#[main]
 async fn main() {
-    let router = Router::new()
-        .get("/", hello);
-    
-    Application::new_(router).run().await.unwrap();
 }
 ```
 
@@ -62,7 +54,7 @@ async fn main() {
 ### 更多示例
 
 ```rust
-use miko::{*, extractor::{Json, Path, Query}};
+use miko::{*, macros::*, extractor::{Json, Path, Query}};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -120,7 +112,7 @@ async fn main() {
         .post("/users", create_user)
         .get("/users/{id}", get_user)
         .get("/search", search);
-    
+
     Application::new_(router).run().await.unwrap();
 }
 ```
@@ -148,13 +140,13 @@ Miko 采用模块化设计，你可以按需启用功能：
 ```toml
 [dependencies]
 # 默认启用核心功能（宏、自动注册、扩展功能）
-miko = "0.3"
+miko = "x.x"
 
 # 或启用所有功能，包括 OpenAPI 和数据验证
-miko = { version = "0.3", features = ["full"] }
+miko = { version = "x.x", features = ["full"] }
 
 # 或只启用需要的功能
-miko = { version = "0.3", features = ["utoipa", "validation"] }
+miko = { version = "x.x", features = ["utoipa", "validation"] }
 ```
 
 可用的 features：
@@ -171,10 +163,10 @@ miko = { version = "0.3", features = ["utoipa", "validation"] }
 
 ```rust
 // 启用 utoipa feature 后，直接使用
-use miko::{OpenApi, ToSchema};
+use miko::{utoipa, OpenApi, ToSchema};
 
-// 启用 validation feature 后，直接使用  
-use miko::{Validate};
+// 启用 validation feature 后，直接使用
+use miko::{garde, Validate};
 ```
 
 ## 🛠️ 核心组件
@@ -219,7 +211,7 @@ async fn list_users(#[dep] db: Arc<Database>) -> Json<Vec<User>> {
 
 ### OpenAPI 文档
 
-自动生成 API 文档：
+自动生成 API 文档：（只是推断params summary descripion required这些，其他的还需要自己写，比如opanapi的一个结构体，还有paths这种）
 
 ```rust
 use miko::*;
@@ -251,7 +243,7 @@ use garde::Validate;
 struct CreateUser {
     #[garde(length(min = 3, max = 50))]
     name: String,
-    
+
     #[garde(contains("@"))]
     email: String,
 }
@@ -264,29 +256,25 @@ async fn create_user(
 }
 ```
 
-## 🌟 示例项目
+## 🌟 示例
 
-查看 `miko/examples/` 目录获取更多示例：
+`miko/examples/` 目录中提供了一个功能全面的 `all-in-one` 示例：
 
-- `demo.rs` - 完整功能演示
-- `error_handling.rs` - 错误处理示例
-- `validation_test.rs` - 数据验证示例
-- `utoipa_demo.rs` - OpenAPI 文档示例
-- `layer_test.rs` - 中间件使用示例
+- **[basic.rs](./miko/examples/basic.rs)**
 
-运行示例：
+该示例覆盖了框架的绝大多数核心功能，包括路由、中间件、依赖注入、WebSocket、文件上传等。强烈建议通过此文件来快速了解 Miko 的用法。
+
+运行该示例：
 
 ```bash
-cargo run --example demo --features full
+cargo run --example basic --features full
 ```
 
 ## 🤝 贡献
 
-欢迎贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解更多信息。
+我们欢迎任何形式的贡献。有关如何贡献代码的详细信息，请参阅 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 📄 许可证
-
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
 ## 🔗 相关链接
 

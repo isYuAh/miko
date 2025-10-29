@@ -20,10 +20,10 @@ impl Parse for LayerAttr {
 pub fn extract_layer_attrs(attrs: &[syn::Attribute]) -> Vec<LayerAttr> {
     let mut layers = Vec::new();
     for attr in attrs {
-        if attr.path().is_ident("layer") {
-            if let Ok(layer_attr) = attr.parse_args::<LayerAttr>() {
-                layers.push(layer_attr);
-            }
+        if attr.path().is_ident("layer")
+            && let Ok(layer_attr) = attr.parse_args::<LayerAttr>()
+        {
+            layers.push(layer_attr);
         }
     }
     layers

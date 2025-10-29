@@ -12,7 +12,7 @@ use crate::error::AppError;
 use crate::extractor::from_request::FRPFut;
 use crate::extractor::from_request::{FRFut, FromRequest, FromRequestParts};
 use crate::extractor::path_params::PathParams;
-use crate::handler::handler::Req;
+use crate::handler::Req;
 use bytes::Bytes;
 use http_body_util::BodyExt;
 use hyper::http::Extensions;
@@ -49,8 +49,7 @@ where
                 .to_bytes();
 
             // 直接使用 JsonParseError，包含原始的 serde_json::Error
-            let json =
-                serde_json::from_slice::<T>(&body).map_err(|e| AppError::JsonParseError(e))?;
+            let json = serde_json::from_slice::<T>(&body).map_err(AppError::JsonParseError)?;
 
             Ok(Json(json))
         })
@@ -64,11 +63,7 @@ where
     fn from_request_parts(req: &mut Parts, _state: Arc<S>) -> FRFut<Self> {
         let query = req.uri.query().unwrap_or("");
         let query = serde_urlencoded::from_str(query);
-        Box::pin(async move {
-            query
-                .map(Query)
-                .map_err(|e| AppError::UrlEncodedParseError(e))
-        })
+        Box::pin(async move { query.map(Query).map_err(AppError::UrlEncodedParseError) })
     }
 }
 
@@ -79,7 +74,7 @@ where
 {
     fn from_request_parts(req: &mut Parts, _state: Arc<S>) -> FRFut<Self> {
         let pp = req.extensions.get_mut::<PathParams>().unwrap();
-        if pp.0.len() < 1 {
+        if pp.0.is_empty() {
             return Box::pin(async move {
                 Err(AppError::BadRequest("No path parameters found".to_string()))
             });
@@ -148,8 +143,8 @@ where
                 .await
                 .map_err(|e| AppError::BadRequest(format!("Failed to read request body: {}", e)))?
                 .to_bytes();
-            let form: T = serde_urlencoded::from_bytes(&body)
-                .map_err(|e| AppError::UrlEncodedParseError(e))?;
+            let form: T =
+                serde_urlencoded::from_bytes(&body).map_err(AppError::UrlEncodedParseError)?;
             Ok(Form(form))
         })
     }

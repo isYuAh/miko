@@ -29,7 +29,7 @@ impl HttpMethod {
             HttpMethod::Trace => quote!(trace),
         }
     }
-    
+
     pub fn from_hyper_method(method: &hyper::Method) -> Self {
         match method.as_str() {
             "GET" => HttpMethod::Get,
@@ -52,13 +52,15 @@ pub fn generate_utoipa_path_attr(
     config: &OpenApiConfig,
 ) -> TokenStream {
     let method_token = method.to_token();
-    
+
     // Summary
     let summary = config.final_summary().map(|s| quote!(summary = #s,));
-    
+
     // Description
-    let description = config.final_description().map(|d| quote!(description = #d,));
-    
+    let description = config
+        .final_description()
+        .map(|d| quote!(description = #d,));
+
     // Tags
     let tags = if !config.final_tags().is_empty() {
         let tag_list = config.final_tags();
@@ -66,23 +68,23 @@ pub fn generate_utoipa_path_attr(
     } else {
         quote!()
     };
-    
+
     // Deprecated
     let deprecated = if config.deprecated {
         quote!(deprecated,)
     } else {
         quote!()
     };
-    
+
     // Params
     let params = generate_params_tokens(config);
-    
+
     // Request Body
     let request_body = generate_request_body_tokens(config);
-    
+
     // Responses
     let responses = generate_responses_tokens(config);
-    
+
     quote! {
         #[::miko::utoipa::path(
             #method_token,
@@ -101,35 +103,35 @@ pub fn generate_utoipa_path_attr(
 /// 生成 params 部分
 fn generate_params_tokens(config: &OpenApiConfig) -> TokenStream {
     let params = config.final_params();
-    
+
     if params.is_empty() {
         return quote!();
     }
-    
+
     let param_defs = params.iter().map(|p| {
         let name = &p.name;
-        let ty = &p.ty;  // 现在 ty 可能是 Option<T> 或 T
+        let ty = &p.ty; // 现在 ty 可能是 Option<T> 或 T
         let location = &p.location;
-        
+
         let desc = p.description.as_ref().map(|d| quote!(description = #d,));
-        
+
         // utoipa 会自动从类型推断 required 状态:
         // - Option<T> -> required=false, nullable=true
         // - T -> required=true
         // 我们不需要手动添加 nullable 或 required 属性
-        
+
         let deprecated = if p.deprecated {
             quote!(deprecated,)
         } else {
             quote!()
         };
         let example = p.example.as_ref().map(|e| quote!(example = #e,));
-        
+
         quote! {
             (#name = #ty, #location, #desc #deprecated #example)
         }
     });
-    
+
     quote! {
         params(
             #(#param_defs),*
@@ -142,7 +144,7 @@ fn generate_request_body_tokens(config: &OpenApiConfig) -> TokenStream {
     if let Some(body) = config.final_request_body() {
         let ty = &body.ty;
         let content_type = &body.content_type;
-        
+
         let desc = body.description.as_ref().map(|d| quote!(description = #d,));
         // utoipa 5 中 request_body 不支持 required 参数
         // let required = if body.required {
@@ -150,7 +152,7 @@ fn generate_request_body_tokens(config: &OpenApiConfig) -> TokenStream {
         // } else {
         //     quote!(required = false,)
         // };
-        
+
         quote! {
             request_body(
                 content = #ty,
@@ -166,15 +168,15 @@ fn generate_request_body_tokens(config: &OpenApiConfig) -> TokenStream {
 /// 生成 responses 部分
 fn generate_responses_tokens(config: &OpenApiConfig) -> TokenStream {
     let responses = config.final_responses();
-    
+
     if responses.is_empty() {
         return quote!();
     }
-    
+
     let resp_defs = responses.iter().map(|r| {
         let status = r.status;
         let desc = &r.description;
-        
+
         if let Some(ref body) = r.body {
             if let Some(ref content_type) = r.content_type {
                 quote! {
@@ -191,7 +193,7 @@ fn generate_responses_tokens(config: &OpenApiConfig) -> TokenStream {
             }
         }
     });
-    
+
     quote! {
         responses(
             #(#resp_defs),*

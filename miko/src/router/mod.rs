@@ -4,8 +4,8 @@ pub mod router_svc;
 #[cfg(feature = "ext")]
 use crate::ext::static_svc::StaticSvcBuilder;
 use crate::extractor::{from_request::FromRequest, path_params::PathParams};
-use crate::handler::handler::{DynHandler, handler_to_svc};
-use crate::handler::handler::{FnOnceTuple, Req, Resp, TypedHandler};
+use crate::handler::{DynHandler, handler_to_svc};
+use crate::handler::{FnOnceTuple, Req, Resp, TypedHandler};
 use crate::http::response::into_response::IntoResponse;
 use crate::router::router_svc::RouterSvc;
 use bytes::Bytes;
@@ -36,12 +36,12 @@ macro_rules! define_method {
             let handler = Arc::new(TypedHandler::new(handler, self.state.clone())) as DynHandler;
             self.routes
                 .entry(Method::$m)
-                .or_insert_with(|| MRouter::new())
+                .or_default()
                 .insert(encode_route(path), handler_to_svc(handler.clone()))
                 .unwrap();
             self.path_map
                 .entry(Method::$m)
-                .or_insert_with(|| HashMap::new())
+                .or_default()
                 .insert(path.to_string(), handler_to_svc(handler.clone()));
             self
         }
@@ -72,6 +72,7 @@ pub type HttpReq = Request<Incoming>;
 /// Tower 兼容的 Service 类型别名
 pub type HttpSvc<T = HttpReq> = BoxCloneService<T, Resp, Infallible>;
 
+type MikoLayer<T = Req> = Arc<dyn Fn(HttpSvc<T>) -> HttpSvc<T> + Send + Sync>;
 /// 路由器，负责注册路由、挂载中间件/服务并进行请求分发
 pub struct Router<S = ()> {
     /// 已注册的路由表（按方法分类）
@@ -79,7 +80,7 @@ pub struct Router<S = ()> {
     /// 共享的全局状态，可由 State<T> 提取
     pub state: Arc<S>,
     /// 待应用的中间件层
-    pub layers: Vec<Arc<dyn Fn(HttpSvc<Req>) -> HttpSvc<Req> + Send + Sync>>,
+    pub layers: Vec<MikoLayer>,
     /// 用于 nest/merge 的路径映射索引
     pub path_map: HashMap<Method, HashMap<String, HttpSvc<Req>>>,
 }
@@ -172,12 +173,12 @@ impl<S: Send + Sync + 'static> Router<S> {
         for m in method.into_methods() {
             self.routes
                 .entry(m.clone())
-                .or_insert_with(|| MRouter::new())
+                .or_default()
                 .insert(encode_route(path), handler_to_svc(handler.clone()))
                 .unwrap();
             self.path_map
                 .entry(m.clone())
-                .or_insert_with(|| HashMap::new())
+                .or_default()
                 .insert(path.to_string(), handler_to_svc(handler.clone()));
         }
         self
@@ -228,12 +229,12 @@ impl<S: Send + Sync + 'static> Router<S> {
                 let boxed: HttpSvc<Req> = BoxCloneService::new(svc);
                 self.routes
                     .entry(method.clone())
-                    .or_insert_with(|| MRouter::new())
+                    .or_default()
                     .insert(&path, boxed.clone())
                     .unwrap();
                 self.path_map
                     .entry(method.clone())
-                    .or_insert_with(|| HashMap::new())
+                    .or_default()
                     .insert(path, boxed.clone());
             }
         }
@@ -258,12 +259,12 @@ impl<S: Send + Sync + 'static> Router<S> {
                 let new_path = format!("{}{}", prefix, path);
                 self.routes
                     .entry(method.clone())
-                    .or_insert_with(|| MRouter::new())
+                    .or_default()
                     .insert(&new_path, boxed.clone())
                     .unwrap();
                 self.path_map
                     .entry(method.clone())
-                    .or_insert_with(|| HashMap::new())
+                    .or_default()
                     .insert(new_path, boxed.clone());
             }
         }
@@ -291,21 +292,21 @@ impl<S: Send + Sync + 'static> Router<S> {
         for method in methods {
             self.routes
                 .entry(method.clone())
-                .or_insert_with(|| MRouter::new())
+                .or_default()
                 .insert(&new_path, boxed.clone())
                 .unwrap();
             self.path_map
                 .entry(method.clone())
-                .or_insert_with(|| HashMap::new())
+                .or_default()
                 .insert(new_path.clone(), boxed.clone());
             self.routes
                 .entry(method.clone())
-                .or_insert_with(|| MRouter::new())
+                .or_default()
                 .insert(&new_path_index, boxed.clone())
                 .unwrap();
             self.path_map
                 .entry(method.clone())
-                .or_insert_with(|| HashMap::new())
+                .or_default()
                 .insert(new_path_index.clone(), boxed.clone());
         }
     }
@@ -326,12 +327,12 @@ impl<S: Send + Sync + 'static> Router<S> {
         for method in methods {
             self.routes
                 .entry(method.clone())
-                .or_insert_with(|| MRouter::new())
+                .or_default()
                 .insert(encode_route(path), svc.clone())
                 .unwrap();
             self.path_map
                 .entry(method.clone())
-                .or_insert_with(|| HashMap::new())
+                .or_default()
                 .insert(path.to_string(), svc.clone());
         }
     }

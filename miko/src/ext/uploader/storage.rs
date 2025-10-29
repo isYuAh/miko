@@ -38,7 +38,7 @@ impl UploaderProcesser for DiskStorage {
                     root,
                     &filename,
                     FileTransferConfig {
-                        max_size: config.max_size.clone(),
+                        max_size: config.max_size,
                     },
                 )
                 .await
@@ -55,13 +55,15 @@ impl DiskStorage {
     }
 }
 
+type FilenameMapper = Arc<dyn Fn(&str) -> String + Send + Sync + 'static>;
+
 /// 磁盘存储配置：文件大小/扩展名/MIME 限制以及文件名映射
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct DiskStorageConfig {
     pub max_size: Option<usize>,
     pub allowed_extensions: Option<Vec<String>>,
     pub allowed_mime_types: Option<Vec<String>>,
-    pub filename_mapper: Option<Arc<dyn Fn(&str) -> String + Send + Sync + 'static>>,
+    pub filename_mapper: Option<FilenameMapper>,
 }
 impl Debug for DiskStorageConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -73,16 +75,7 @@ impl Debug for DiskStorageConfig {
             .finish()
     }
 }
-impl Default for DiskStorageConfig {
-    fn default() -> Self {
-        Self {
-            max_size: None,
-            allowed_extensions: None,
-            allowed_mime_types: None,
-            filename_mapper: None,
-        }
-    }
-}
+
 impl DiskStorageConfig {
     /// 限制最大文件尺寸（字节）
     pub fn max_size(mut self, max_size: usize) -> Self {

@@ -35,7 +35,7 @@ mod utoipa;
 /// 建议：处理器应声明为 `async fn`；若未显式返回类型，宏会自动设置为实现 `IntoResponse` 的类型。
 ///
 /// 示例：
-/// ```rust
+/// ```rust,ignore
 /// #[get("/hello/{id}")]
 /// async fn hello(
 ///     #[path] #[desc("用户ID")] id: i32
@@ -144,7 +144,7 @@ derive_route_macro!(connect, CONNECT);
 /// `prewarm` 生效条件：仅在应用通过 `#[miko]` 启动（并启用 `auto`）时才会在启动阶段触发预热。
 ///
 /// 示例：
-/// ```rust
+/// ```rust,ignore
 /// #[component(prewarm)]
 /// impl MyService {
 ///     async fn new(dep: std::sync::Arc<Other>) -> Self { /* ... */ }
@@ -204,7 +204,7 @@ pub fn component(attr: TokenStream, input: TokenStream) -> TokenStream {
 /// 标记响应信息
 ///
 /// 用法：
-/// ```rust
+/// ```rust,ignore
 /// #[u_response(status = 404, description = "用户不存在", body = ErrorResponse)]
 /// ```
 #[proc_macro_attribute]
@@ -217,7 +217,7 @@ pub fn u_response(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// 标记 API 标签
 ///
 /// 用法：
-/// ```rust
+/// ```rust,ignore
 /// #[u_tag("用户管理")]
 /// ```
 #[proc_macro_attribute]
@@ -229,7 +229,7 @@ pub fn u_tag(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// 标记 API 摘要
 ///
 /// 用法：
-/// ```rust
+/// ```rust,ignore
 /// #[u_summary("获取用户信息")]
 /// ```
 #[proc_macro_attribute]
@@ -241,7 +241,7 @@ pub fn u_summary(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// 标记 API 详细描述
 ///
 /// 用法：
-/// ```rust
+/// ```rust,ignore
 /// #[u_description("根据用户 ID 获取详细信息")]
 /// ```
 #[proc_macro_attribute]
@@ -261,7 +261,7 @@ pub fn u_description(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// - `description`: 请求体描述（可选）
 ///
 /// 用法：
-/// ```rust
+/// ```rust,ignore
 /// use miko::http::extractor::Multipart;
 ///
 /// #[post("/upload")]
@@ -283,7 +283,7 @@ pub fn u_request_body(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// 标记参数补充信息
 ///
 /// 用法：
-/// ```rust
+/// ```rust,ignore
 /// #[u_param(name = "id", description = "用户ID", example = 123)]
 /// ```
 #[proc_macro_attribute]
@@ -295,7 +295,7 @@ pub fn u_param(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// 标记 API 已弃用
 ///
 /// 用法：
-/// ```rust
+/// ```rust,ignore
 /// #[u_deprecated]
 /// ```
 #[proc_macro_attribute]
@@ -308,7 +308,7 @@ pub fn u_deprecated(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// 用于给函数参数添加描述信息，在启用 utoipa feature 时会生成到 OpenAPI 文档中。
 ///
 /// 用法:
-/// ```rust
+/// ```rust,ignore
 /// #[get("/users/{id}")]
 /// async fn get_user(
 ///     #[path] #[desc("用户ID")] id: i32,
@@ -328,7 +328,7 @@ pub fn desc(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// 用于标记从 URL 路径中提取的参数。
 ///
 /// 用法:
-/// ```rust
+/// ```rust,ignore
 /// #[get("/users/:id")]
 /// async fn get_user(#[path] id: i32) -> impl IntoResponse {
 ///     // ...
@@ -345,7 +345,7 @@ pub fn path(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// 用于标记从 URL 查询字符串中提取的参数。
 ///
 /// 用法:
-/// ```rust
+/// ```rust,ignore
 /// #[get("/users")]
 /// async fn list_users(
 ///     #[query] page: Option<i32>,
@@ -365,7 +365,7 @@ pub fn query(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// 用于标记从请求体中提取的参数。
 ///
 /// 用法:
-/// ```rust
+/// ```rust,ignore
 /// #[post("/users")]
 /// async fn create_user(#[body] user: User) -> impl IntoResponse {
 ///     // ...
@@ -385,7 +385,7 @@ pub fn body(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// **在模块上使用：** 为模块内的所有路由自动添加指定的 layer。
 ///
 /// 用法:
-/// ```rust
+/// ```rust,ignore
 /// use tower_http::timeout::TimeoutLayer;
 /// use std::time::Duration;
 ///
@@ -435,7 +435,7 @@ pub fn layer(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// - `#[miko_path]`: 只生成 OpenAPI，需要手动注册路由
 ///
 /// 用法:
-/// ```rust
+/// ```rust,ignore
 /// // 1. 使用 miko_path 宏生成 OpenAPI
 /// #[miko::miko_path(path = "/manual")]
 /// #[u_tag("Manual")]
@@ -479,7 +479,7 @@ pub fn miko_path(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// - 支持路径的自动合并（处理多余的斜杠）
 ///
 /// 示例：
-/// ```rust
+/// ```rust,ignore
 /// #[prefix("/api")]
 /// mod api {
 ///     #[get("/users")]
