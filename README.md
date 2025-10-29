@@ -272,6 +272,8 @@ cargo run --example basic --features full
 
 ## 🤝 贡献
 
+我们欢迎任何形式的贡献。有关如何贡献代码的详细信息，请参阅 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
 ## 📄 许可证
 
 ## 🔗 相关链接

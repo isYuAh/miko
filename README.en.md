@@ -273,6 +273,8 @@ cargo run --example basic --features full
 
 ## 🤝 Contributing
 
+We welcome contributions of any kind. For details on how to contribute, please see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## 📄 License
 
 ## 🔗 Related Links
