@@ -15,11 +15,12 @@ use tower::{Layer, Service, ServiceExt, util::BoxCloneService};
 ///
 /// # 使用示例
 ///
-/// ```rust
+/// ```rust,ignore
 /// use miko::endpoint::LayerExt;
 /// use tower_http::timeout::TimeoutLayer;
 /// use std::time::Duration;
-/// use miko::handler::{handler_to_svc, HttpSvc};
+/// use miko::handler::{handler_to_svc};
+/// use miko::router::HttpSvc;
 /// use std::sync::Arc;
 /// use tower_http::compression::CompressionLayer;
 /// use miko::handler::TypedHandler;

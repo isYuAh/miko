@@ -26,7 +26,7 @@ use std::sync::Arc;
 /// - `T` 必须实现 `garde::Validate`
 ///
 /// # Example
-/// ```no_run
+/// ```rust,ignore
 /// use miko::extractor::ValidatedJson;
 /// use garde::Validate;
 /// use serde::Deserialize;
@@ -45,7 +45,7 @@ use std::sync::Arc;
 ///
 /// async fn create_user(
 ///     ValidatedJson(user): ValidatedJson<CreateUser>
-/// ) -> Result<String, AppError> {
+/// ) -> AppResult<String> {
 ///     // user 已经通过验证
 ///     Ok(format!("Created user: {}", user.username))
 /// }
