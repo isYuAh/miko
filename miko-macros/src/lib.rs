@@ -160,6 +160,61 @@ pub fn component(attr: TokenStream, input: TokenStream) -> TokenStream {
     let args = syn::parse_macro_input!(attr as StrAttrMap);
     let input_struct = parse_macro_input!(input as ItemImpl);
     let prewarm = args.get("prewarm").is_some();
+    let mut lifetime_singleton = true;
+    let mut lifetime_specified = false;
+
+    let mut set_lifetime = |mode: &str| {
+        let normalized = mode.to_ascii_lowercase();
+        match normalized.as_str() {
+            "singleton" => {
+                if lifetime_specified && !lifetime_singleton {
+                    panic!(
+                        "Conflicting #[component] lifetime: both singleton and transient specified"
+                    );
+                }
+                lifetime_singleton = true;
+                lifetime_specified = true;
+            }
+            "transient" => {
+                if lifetime_specified && lifetime_singleton {
+                    panic!(
+                        "Conflicting #[component] lifetime: both singleton and transient specified"
+                    );
+                }
+                lifetime_singleton = false;
+                lifetime_specified = true;
+            }
+            _ => panic!(
+                "Invalid #[component] lifetime '{}'. Expected `singleton` or `transient`.",
+                mode
+            ),
+        }
+    };
+
+    if let Some(mode) = args.get("mode") {
+        set_lifetime(mode);
+    } else if let Some(default_mode) = args.default.as_ref() {
+        set_lifetime(default_mode);
+    }
+
+    if args.map.contains_key("singleton") {
+        set_lifetime("singleton");
+    }
+    if args.map.contains_key("transient") {
+        set_lifetime("transient");
+    }
+
+    if prewarm && !lifetime_singleton {
+        panic!(
+            "`#[component(prewarm, transient)]` is invalid because transient components cannot be prewarmed"
+        );
+    }
+
+    let lifetime_tokens = if lifetime_singleton {
+        quote!(::miko::dependency_container::DependencyLifetime::Singleton)
+    } else {
+        quote!(::miko::dependency_container::DependencyLifetime::Transient)
+    };
     let mut depend_get_stmts = Vec::new();
     let mut arg_idents = Vec::new();
     let type_ident = match *input_struct.self_ty.clone() {
@@ -185,6 +240,7 @@ pub fn component(attr: TokenStream, input: TokenStream) -> TokenStream {
                     type_id: std::any::TypeId::of::<#type_ident>(),
                     prewarm: #prewarm,
                     name: "___",
+                    lifetime: #lifetime_tokens,
                     init_fn: || {
                         Box::pin(async move {
                             #(#depend_get_stmts)*

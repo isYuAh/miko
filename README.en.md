@@ -210,6 +210,8 @@ async fn list_users(#[dep] db: Arc<Database>) -> Json<Vec<User>> {
 }
 ```
 
+Components are singletons by default. Use `#[component(transient)]` (or `#[component(mode = "transient")]`) when you need a brand-new instance for every injection; `prewarm` remains available only for singleton components.
+
 ### OpenAPI Documentation
 
 Automatically generate API documentation: (This just infers params, summary, description, required, etc. You still need to write other things yourself, like an OpenAPI struct and paths.)
