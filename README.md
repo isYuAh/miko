@@ -209,6 +209,8 @@ async fn list_users(#[dep] db: Arc<Database>) -> Json<Vec<User>> {
 }
 ```
 
+默认情况下组件以单例模式注册；可通过 `#[component(transient)]` 或 `#[component(mode = "transient")]` 让每次注入都创建新的实例（此模式下不支持 `prewarm`）。
+
 ### OpenAPI 文档
 
 自动生成 API 文档：（只是推断params summary descripion required这些，其他的还需要自己写，比如opanapi的一个结构体，还有paths这种）
