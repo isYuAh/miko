@@ -23,6 +23,7 @@
 - ✅ **Data Validation** - Integrated with `garde` for powerful data validation capabilities.
 - 🌐 **WebSocket** - Native WebSocket support.
 - 🔍 **Unified Error Handling** - Elegant error handling mechanism.
+- 🔄 **Graceful Shutdown** - Signal handling and connection draining.
 - 🎭 **Tower Ecosystem** - Compatible with the Tower middleware ecosystem.
 
 ## 🚀 Quick Start
