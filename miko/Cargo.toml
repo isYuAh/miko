@@ -31,7 +31,7 @@ inventory = {version =  "0.3.21", optional = true }
 multer = "3.1.0"
 tower-http = { version = "0.6.6", optional = true, features = ["cors"] }
 httpdate = {version =  "1.0.3", optional = true }
-tokio-util = "0.7.16"
+tokio-util = { version = "0.7.16", features = ["rt"] }
 tempfile = "3.23.0"
 tokio-stream = "0.1.17"
 tungstenite = "0.28.0"
