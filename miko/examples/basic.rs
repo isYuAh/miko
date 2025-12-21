@@ -75,7 +75,8 @@ async fn json_req(
 
 #[prefix("/sub")] // use `mod` to define sub routes
 mod sub_routes {
-    use super::*; // import necessary items from the parent module
+    use super::*;
+    // import necessary items from the parent module
 
     #[get("/hello")]
     async fn sub_hello() -> &'static str {
@@ -262,7 +263,7 @@ async fn multipart(multipart: MultipartResult) {
     )
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, ToSchema)]
 #[allow(unused)]
 struct FormStruct {
     field1: String,
