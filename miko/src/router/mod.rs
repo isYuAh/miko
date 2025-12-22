@@ -13,7 +13,7 @@ use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::{Method, Request, Response, body::Incoming};
 use matchit::Router as MRouter;
-use miko_core::{BoxError, IntoMethods, encode_route};
+use miko_core::{BoxError, IntoMethods, MikoError, encode_route};
 use nested::NestLayer;
 #[cfg(feature = "ext")]
 use std::path::PathBuf;
@@ -351,7 +351,7 @@ impl<S: Send + Sync + 'static> Router<S> {
     where
         L: Layer<HttpSvc<Req>> + Send + Sync + 'static,
         L::Service: Service<Req, Response = Response<B>> + Clone + Send + 'static,
-        <L::Service as Service<Req>>::Error: Into<AppError>,
+        <L::Service as Service<Req>>::Error: Into<AppError> + Send + Sync + 'static,
         <L::Service as Service<Req>>::Future: Send + 'static,
         B: http_body::Body<Data = Bytes> + Send + Sync + 'static,
         B::Error: Into<BoxError>,
@@ -361,7 +361,7 @@ impl<S: Send + Sync + 'static> Router<S> {
             let standardized = tower::ServiceBuilder::new()
                 .map_response(|resp: Response<B>| {
                     let (parts, body) = resp.into_parts();
-                    let body = body.map_err(Into::into).boxed();
+                    let body = body.map_err(|e| MikoError::from(e.into())).boxed();
                     Response::from_parts(parts, body)
                 })
                 .map_err(Into::into)

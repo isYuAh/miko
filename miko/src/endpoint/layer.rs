@@ -7,7 +7,7 @@ use bytes::Bytes;
 use http_body::Body;
 use http_body_util::BodyExt;
 use hyper::Response;
-use miko_core::BoxError;
+use miko_core::{BoxError, MikoError};
 use std::future::Future;
 use std::sync::Arc;
 use tower::{Layer, Service, ServiceExt, util::BoxCloneService};
@@ -90,7 +90,7 @@ impl LayerExt<HttpSvc<Req>> for HttpSvc<Req> {
             .layer(self)
             .map_response(|resp| {
                 let (parts, body) = resp.into_parts();
-                let body = body.map_err(Into::into).boxed();
+                let body = body.map_err(|e| MikoError::from(e.into())).boxed();
                 Response::from_parts(parts, body)
             })
             .map_err(Into::into);

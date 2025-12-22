@@ -29,7 +29,7 @@ impl Service<Request<Incoming>> for IncomingToInternal {
     fn call(&mut self, req_incoming: Request<Incoming>) -> Self::Future {
         let mut inner = self.inner.clone();
         Box::pin(async move {
-            let req: Req = req_incoming.map(|inc| inc.map_err(|_| unreachable!()).boxed());
+            let req: Req = req_incoming.map(|inc| inc.map_err(Into::into).boxed());
             let resp = inner.call(req).await.unwrap_or_else(|e| e.into_response());
             Ok(resp)
         })

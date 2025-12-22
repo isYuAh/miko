@@ -1,7 +1,53 @@
 use bytes::Bytes;
 use http_body_util::combinators::BoxBody;
 use hyper::{Request, Response};
-use std::convert::Infallible;
+use std::fmt;
+
+pub struct MikoError(pub Box<dyn std::error::Error + Send + Sync + 'static>);
+
+impl fmt::Debug for MikoError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.0, f)
+    }
+}
+
+impl fmt::Display for MikoError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl std::error::Error for MikoError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.0.source()
+    }
+}
+
+impl From<Box<dyn std::error::Error + Send + Sync + 'static>> for MikoError {
+    fn from(err: Box<dyn std::error::Error + Send + Sync + 'static>) -> Self {
+        MikoError(err)
+    }
+}
+
+impl From<std::convert::Infallible> for MikoError {
+    fn from(err: std::convert::Infallible) -> Self {
+        match err {}
+    }
+}
+
+impl From<hyper::Error> for MikoError {
+    fn from(err: hyper::Error) -> Self {
+        MikoError(Box::new(err))
+    }
+}
+
+impl From<std::io::Error> for MikoError {
+    fn from(err: std::io::Error) -> Self {
+        MikoError(Box::new(err))
+    }
+}
+
+pub type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub enum HTTPStatusCode {
     OK = 200,
@@ -39,7 +85,7 @@ pub enum HTTPStatusCode {
     InternalServerError = 500,
 }
 
-pub type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
-pub type RespBody = BoxBody<Bytes, BoxError>;
+pub type RespBody = BoxBody<Bytes, MikoError>;
+pub type ReqBody = BoxBody<Bytes, MikoError>;
 pub type Resp = Response<RespBody>;
-pub type Req = Request<BoxBody<Bytes, Infallible>>;
+pub type Req = Request<ReqBody>;

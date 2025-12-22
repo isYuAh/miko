@@ -302,6 +302,12 @@ impl From<Box<dyn std::error::Error>> for AppError {
     }
 }
 
+impl From<Box<dyn std::error::Error + Send + Sync>> for AppError {
+    fn from(err: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        Self::InternalServerError(err.to_string())
+    }
+}
+
 // ============ garde 验证库集成 ============
 #[cfg(feature = "validation")]
 impl From<garde::Report> for AppError {
