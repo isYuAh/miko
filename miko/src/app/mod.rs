@@ -126,7 +126,7 @@ impl Application {
 
 #[cfg(feature = "test")]
 impl Application {
-    pub fn _test_client(&mut self) -> crate::test::test_client::TestClient {
+    pub fn test_client(&mut self) -> crate::test::test_client::TestClient {
         crate::test::test_client::TestClient::new(self.svc.clone())
     }
 }

@@ -59,12 +59,14 @@ pub struct LazyDependencyContainer {
     pub registry: HashMap<(TypeId, &'static str), DependencyEntry>,
 }
 impl LazyDependencyContainer {
+    /// 创建一个新的依赖容器
     pub fn new() -> Self {
         LazyDependencyContainer {
             registry: HashMap::new(),
         }
     }
     #[cfg(feature = "auto")]
+    /// 创建一个新的依赖容器,并自动收集所有注册的依赖
     pub fn new_() -> Arc<RwLock<Self>> {
         let mut registry = HashMap::new();
         let deps: Vec<DependencyDef> = inventory::iter::<DependencyDefFn>

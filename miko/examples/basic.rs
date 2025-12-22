@@ -295,11 +295,10 @@ struct AnotherAppState {
     pub description: String,
 }
 
-#[miko(sse, catch)]
+#[miko(sse, catch, build)]
 // the sse attribute can set a panic hook that ignore error caused by `or_break()`
 // the catch attribute can catch panics in handlers and convert them to 500 responses
-async fn main() {
-    tracing_subscriber::fmt::init(); // initialize logging (optional)
+pub async fn create_app() {
     let mut no_macro_router = Router::new();
     no_macro_router.get("/", async move || "Hello, World! (manually defined router)");
     no_macro_router.get(
@@ -355,6 +354,13 @@ async fn main() {
     ); // static file service with CORS enabled and SPA fallback
 
     router.cors_any(); // convienient method to enable CORS for all origins
+}
+
+#[tokio::main]
+async fn main() {
+    tracing_subscriber::fmt::init(); // initialize logging (optional)
+    let app = create_app().await;
+    app.run().await.unwrap();
 }
 
 #[derive(Clone)]
