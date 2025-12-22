@@ -1,3 +1,4 @@
+use crate::AppError;
 use crate::extractor::from_request::FromRequest;
 use crate::handler::{FnOnceTuple, Req, TypedHandler, handler_to_svc};
 use crate::http::response::into_response::IntoResponse;
@@ -6,7 +7,7 @@ use bytes::Bytes;
 use http_body::Body;
 use http_body_util::BodyExt;
 use hyper::Response;
-use std::convert::Infallible;
+use miko_core::BoxError;
 use std::future::Future;
 use std::sync::Arc;
 use tower::{Layer, Service, ServiceExt, util::BoxCloneService};
@@ -43,9 +44,10 @@ pub trait LayerExt<Svc>: Sized {
     where
         Svc: Service<Req>,
         L: Layer<Svc>,
-        L::Service:
-            Service<Req, Response = Response<B>, Error = Infallible> + Clone + Send + 'static,
-        B: Body<Data = Bytes, Error = Infallible> + Send + Sync + 'static,
+        L::Service: Service<Req, Response = Response<B>> + Clone + Send + 'static,
+        <L::Service as Service<Req>>::Error: Into<AppError>,
+        B: Body<Data = Bytes> + Send + Sync + 'static,
+        B::Error: Into<BoxError>,
         <L::Service as Service<Req>>::Future: Send + 'static;
 
     /// 为当前 handler 或 service 应用一个 layer（使用 with_layer 别名）
@@ -53,9 +55,10 @@ pub trait LayerExt<Svc>: Sized {
     where
         Svc: Service<Req>,
         L: Layer<Svc>,
-        L::Service:
-            Service<Req, Response = Response<B>, Error = Infallible> + Clone + Send + 'static,
-        B: Body<Data = Bytes, Error = Infallible> + Send + Sync + 'static,
+        L::Service: Service<Req, Response = Response<B>> + Clone + Send + 'static,
+        <L::Service as Service<Req>>::Error: Into<AppError>,
+        B: Body<Data = Bytes> + Send + Sync + 'static,
+        B::Error: Into<BoxError>,
         <L::Service as Service<Req>>::Future: Send + 'static,
     {
         self.layer(layer)
@@ -77,16 +80,20 @@ impl LayerExt<HttpSvc<Req>> for HttpSvc<Req> {
     fn layer<L, B>(self, layer: L) -> HttpSvc<Req>
     where
         L: Layer<Self>,
-        L::Service:
-            Service<Req, Response = Response<B>, Error = Infallible> + Clone + Send + 'static,
-        B: Body<Data = Bytes, Error = Infallible> + Send + Sync + 'static,
+        L::Service: Service<Req, Response = Response<B>> + Clone + Send + 'static,
+        <L::Service as Service<Req>>::Error: Into<AppError>,
+        B: Body<Data = Bytes> + Send + Sync + 'static,
+        B::Error: Into<BoxError>,
         <L::Service as Service<Req>>::Future: Send + 'static,
     {
-        let layered_svc = layer.layer(self).map_response(|resp| {
-            let (parts, body) = resp.into_parts();
-            let body = body.boxed();
-            Response::from_parts(parts, body)
-        });
+        let layered_svc = layer
+            .layer(self)
+            .map_response(|resp| {
+                let (parts, body) = resp.into_parts();
+                let body = body.map_err(Into::into).boxed();
+                Response::from_parts(parts, body)
+            })
+            .map_err(Into::into);
         BoxCloneService::new(layered_svc)
     }
 }

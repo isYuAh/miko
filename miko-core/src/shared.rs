@@ -39,6 +39,7 @@ pub enum HTTPStatusCode {
     InternalServerError = 500,
 }
 
-pub type RespBody = BoxBody<Bytes, Infallible>;
+pub type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
+pub type RespBody = BoxBody<Bytes, BoxError>;
 pub type Resp = Response<RespBody>;
-pub type Req = Request<RespBody>;
+pub type Req = Request<BoxBody<Bytes, Infallible>>;

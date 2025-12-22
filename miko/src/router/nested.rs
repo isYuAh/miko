@@ -1,8 +1,8 @@
+use crate::AppError;
 use crate::extractor::path_params::PathParams;
 use crate::handler::{Req, Resp};
 use hyper::http::uri::PathAndQuery;
 use hyper::{Request, Uri};
-use std::convert::Infallible;
 use std::future::Future;
 use std::pin::Pin;
 use std::str::FromStr;
@@ -39,12 +39,12 @@ impl<S> Layer<S> for NestLayer {
 
 impl<S> Service<Req> for NestSvc<S>
 where
-    S: Service<Req, Response = Resp, Error = Infallible> + Clone + Send + 'static,
+    S: Service<Req, Response = Resp, Error = AppError> + Clone + Send + 'static,
     S::Future: Send + 'static,
 {
     type Response = Resp;
-    type Error = Infallible;
-    type Future = Pin<Box<dyn Future<Output = Result<Resp, Infallible>> + Send>>;
+    type Error = AppError;
+    type Future = Pin<Box<dyn Future<Output = Result<Resp, AppError>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)

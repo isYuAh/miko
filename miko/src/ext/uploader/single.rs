@@ -1,3 +1,4 @@
+use crate::AppError;
 use crate::ext::uploader::{FileField, UploadedFile};
 use crate::extractor::from_request::FromRequest;
 use crate::extractor::multipart::Multipart;
@@ -5,7 +6,6 @@ use crate::handler::Req;
 use crate::http::response::into_response::IntoResponse;
 use hyper::StatusCode;
 use miko_core::Resp;
-use std::convert::Infallible;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -30,7 +30,7 @@ where
     H: UploaderProcesser + Clone + Send + Sync + 'static,
 {
     type Response = Resp;
-    type Error = Infallible;
+    type Error = AppError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
@@ -44,7 +44,7 @@ where
             loop {
                 let field = multipart.next_field().await;
                 if let Err(e) = field {
-                    return Ok(crate::AppError::InternalServerError(e.to_string()).into_response());
+                    return Ok(AppError::InternalServerError(e.to_string()).into_response());
                 }
                 if let Some(field) = field.unwrap() {
                     if field.file_name().is_some() {

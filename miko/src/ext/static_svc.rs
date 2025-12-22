@@ -1,10 +1,11 @@
-use crate::http::response::into_response::IntoResponse;
+use crate::AppError;
+use crate::http::response::into_response::{IntoResponse, bytes_to_boxed};
 use crate::router::HttpSvc;
+use bytes::Bytes;
 use http_body_util::BodyExt;
 use hyper::{Method, Response, StatusCode, header};
 use miko_core::fallible_stream_body::FallibleStreamBody;
 use miko_core::{Req, Resp, decode_path};
-use std::convert::Infallible;
 use std::future::Future;
 use std::io::SeekFrom;
 use std::path::{Component, Path, PathBuf};
@@ -153,7 +154,7 @@ impl StaticSvc {
             return Ok(Response::builder()
                 .status(StatusCode::NOT_MODIFIED)
                 .header(header::ETAG, etag)
-                .body(miko_core::fast_builder::box_empty_body())
+                .body(bytes_to_boxed(Bytes::new()))
                 .unwrap());
         }
 
@@ -187,23 +188,21 @@ impl StaticSvc {
                         );
 
                     if method == Method::HEAD {
-                        return Ok(builder
-                            .body(miko_core::fast_builder::box_empty_body())
-                            .unwrap());
+                        return Ok(builder.body(bytes_to_boxed(Bytes::new())).unwrap());
                     }
 
                     // 使用 ReaderStream 读取指定范围的数据
                     let limited_file = file.take(content_length);
                     let stream = ReaderStream::new(limited_file);
                     let body = FallibleStreamBody::with_size_hint(stream, content_length);
-                    return Ok(builder.body(body.boxed()).unwrap());
+                    return Ok(builder.body(body.map_err(Into::into).boxed()).unwrap());
                 }
                 Err(()) => {
                     // Range 超出范围，返回 416 Range Not Satisfiable
                     return Ok(Response::builder()
                         .status(StatusCode::RANGE_NOT_SATISFIABLE)
                         .header(header::CONTENT_RANGE, format!("bytes */{}", file_size))
-                        .body(miko_core::fast_builder::box_empty_body())
+                        .body(bytes_to_boxed(Bytes::new()))
                         .unwrap());
                 }
                 Ok(None) => {
@@ -217,15 +216,13 @@ impl StaticSvc {
             .header(header::CONTENT_LENGTH, file_size);
 
         if method == Method::HEAD {
-            return Ok(builder
-                .body(miko_core::fast_builder::box_empty_body())
-                .unwrap());
+            return Ok(builder.body(bytes_to_boxed(Bytes::new())).unwrap());
         }
 
         let file = File::open(path).await?;
         let stream = ReaderStream::new(file);
         let body = FallibleStreamBody::with_size_hint(stream, file_size);
-        Ok(builder.body(body.boxed()).unwrap())
+        Ok(builder.body(body.map_err(Into::into).boxed()).unwrap())
     }
 }
 
@@ -311,7 +308,7 @@ impl StaticSvcBuilder {
 
 impl Service<Req> for StaticSvc {
     type Response = Resp;
-    type Error = Infallible;
+    type Error = AppError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
