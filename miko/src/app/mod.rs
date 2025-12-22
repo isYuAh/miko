@@ -124,6 +124,13 @@ impl Application {
     }
 }
 
+#[cfg(feature = "test")]
+impl Application {
+    pub fn test_client(&mut self) -> crate::test::test_client::TestClient {
+        crate::test::test_client::TestClient::new(self.svc.clone())
+    }
+}
+
 /// 监听终止信号
 async fn shutdown_signal() {
     let ctrl_c = async {

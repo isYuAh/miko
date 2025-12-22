@@ -62,6 +62,8 @@ pub fn route(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn miko(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
+    let fn_name = &input_fn.sig.ident;
+    let fn_vis = &input_fn.vis;
     let str_attr_map = parse_macro_input!(attr as StrAttrMap);
     let user_statements = &input_fn.block.stmts;
     let set_panic_hook = if str_attr_map.map.contains_key("sse") {
@@ -85,32 +87,45 @@ pub fn miko(attr: TokenStream, item: TokenStream) -> TokenStream {
     } else {
         None
     };
+    let build_sign = str_attr_map.map.contains_key("build");
     let dep_init = if cfg!(feature = "auto") {
         quote! {
-            ::miko::dependency_container::CONTAINER.get_or_init(|| async {
-                ::miko::dependency_container::LazyDependencyContainer::new_()
-            }).await;
+            ::miko::auto::init_container().await;
         }
     } else {
         quote! {}
     };
-    quote! {
-        #[::miko::tokio::main]
-        async fn main() {
-            #set_panic_hook
-            let mut _config = ::miko::app::config::ApplicationConfig::load_().unwrap_or_default();
-            let mut router = ::miko::router::Router::new();
-            #catch_panic
-            #dep_init
+    if build_sign {
+        quote! {
+            #fn_vis async fn #fn_name() -> ::miko::app::Application {
+                #set_panic_hook
+                let mut _config = ::miko::app::config::ApplicationConfig::load_().unwrap_or_default();
+                let mut router = ::miko::router::Router::new();
+                #catch_panic
+                #dep_init
 
-            #( #user_statements )*
+                #( #user_statements )*
 
-            router.merge(::miko::auto::collect_global_router());
-            let app = ::miko::app::Application::new(_config, router.take());
-            ::miko::tokio::spawn(async {
-                ::miko::dependency_container::CONTAINER.get().unwrap().read().await.prewarm_all().await;
-            });
-            app.run().await.unwrap();
+                router.merge(::miko::auto::collect_global_router());
+                ::miko::app::Application::new(_config, router.take())
+            }
+        }
+    } else {
+        quote! {
+            #[::miko::tokio::main]
+            async fn main() {
+                #set_panic_hook
+                let mut _config = ::miko::app::config::ApplicationConfig::load_().unwrap_or_default();
+                let mut router = ::miko::router::Router::new();
+                #catch_panic
+                #dep_init
+
+                #( #user_statements )*
+
+                router.merge(::miko::auto::collect_global_router());
+                let app = ::miko::app::Application::new(_config, router.take());
+                app.run().await.unwrap();
+            }
         }
     }
     .into()
@@ -394,22 +409,23 @@ pub fn desc(_attr: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
-/// 标记路径参数
-///
-/// 用于标记从 URL 路径中提取的参数。
-///
-/// 用法:
-/// ```rust,ignore
-/// #[get("/users/:id")]
-/// async fn get_user(#[path] id: i32) -> impl IntoResponse {
-///     // ...
-/// }
-/// ```
-#[proc_macro_attribute]
-pub fn path(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    // 这个宏不做任何转换，只是作为标记供 route 宏读取
-    item
-}
+// 防止覆盖 builtin 宏
+// /// 标记路径参数
+// ///
+// /// 用于标记从 URL 路径中提取的参数。
+// ///
+// /// 用法:
+// /// ```rust,ignore
+// /// #[get("/users/:id")]
+// /// async fn get_user(#[path] id: i32) -> impl IntoResponse {
+// ///     // ...
+// /// }
+// /// ```
+// #[proc_macro_attribute]
+// pub fn path(_attr: TokenStream, item: TokenStream) -> TokenStream {
+//     // 这个宏不做任何转换，只是作为标记供 route 宏读取
+//     item
+// }
 
 /// 标记查询参数
 ///

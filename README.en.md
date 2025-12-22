@@ -22,6 +22,7 @@
 - 📝 **OpenAPI Support** - Seamless integration with `utoipa` for automatic API documentation generation.
 - ✅ **Data Validation** - Integrated with `garde` for powerful data validation capabilities.
 - 🌐 **WebSocket** - Native WebSocket support.
+- ✅ **Built-in Testing** - Powerful TestClient for lightning-fast in-process integration testing.
 - 🔍 **Unified Error Handling** - Elegant error handling mechanism.
 - 🔄 **Graceful Shutdown** - Signal handling and connection draining.
 - 🎭 **Tower Ecosystem** - Compatible with the Tower middleware ecosystem.
@@ -54,7 +55,7 @@ After running the program, visit `http://localhost:8080`.
 
 ### More Examples
 
-```rust
+```rust,ignore
 use miko::{*, macros::*, extractor::{Json, Path, Query}};
 use serde::{Deserialize, Serialize};
 
@@ -133,13 +134,14 @@ async fn main() {
 - **[Configuration Management](docs/en/configuration_management.md)** - Application configuration
 - **[OpenAPI Integration](docs/en/openapi_integration.md)** - API documentation generation
 - **[Data Validation](docs/en/data_validation.md)** - Request data validation
+- **[Integration Testing](docs/en/integration_testing.md)** - High-speed integration testing tools
 - **[Advanced Features](docs/en/advanced_features.md)** - Advanced functionalities
 
 ## 🎯 Features
 
 Miko has a modular design, allowing you to enable features as needed:
 
-```toml
+```toml,ignore
 [dependencies]
 # By default, core features are enabled (macros, auto-registration, extensions)
 miko = "x.x"
@@ -158,6 +160,7 @@ Available features:
 - `macro` - Enables route macros (`#[get]`, `#[post]`, etc.)
 - `auto` - Enables automatic route registration and dependency injection
 - `ext` - Enables extension features (quick CORS, static files, etc.)
+- `test` - Enables integration testing tools (`TestClient`)
 - `utoipa` - Enables OpenAPI documentation generation (automatically re-exports the `utoipa` crate)
 - `validation` - Enables data validation (automatically re-exports the `garde` crate)
 

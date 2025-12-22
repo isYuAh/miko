@@ -405,6 +405,14 @@ impl<S: Send + Sync + 'static> Router<S> {
     }
 }
 
+#[cfg(feature = "test")]
+impl<S: Send + Sync + 'static> Router<S> {
+    /// 创建一个测试客户端，用于发送请求并断言响应
+    pub fn test_client(self) -> crate::test::test_client::TestClient {
+        crate::test::test_client::TestClient::new(self.into_tower_service())
+    }
+}
+
 #[cfg(feature = "ext")]
 impl<S: Send + Sync + 'static> Router<S> {
     /// 简易的静态文件服务

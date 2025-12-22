@@ -14,6 +14,8 @@ pub mod error;
 pub mod extractor;
 pub mod http;
 pub mod router;
+#[cfg(feature = "test")]
+pub mod test;
 pub mod ws;
 
 pub use hyper;

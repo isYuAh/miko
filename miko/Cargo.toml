@@ -48,9 +48,11 @@ ext = ["dep:tower-http", "tower-http/cors", "httpdate"]
 catch_panic = ["dep:tower-http", "tower-http/catch-panic", "miko-macros/catch_panic"]
 utoipa = ["miko-macros/utoipa", "dep:utoipa"]
 validation = ["garde"]
+test = []
 
 [[example]]
 name = "basic"
+required-features = ["full", "test"]
 
 [[example]]
 name = "utoipa_demo"
@@ -61,7 +63,8 @@ name = "validation_test"
 required-features = ["full"]
 
 [dev-dependencies]
-utoipa-scalar = { version = "0.2", features = ["axum"] }
+miko = { path = ".", features = ["full", "test"] }
+utoipa-scalar = { version = "0.3.0" }
 tracing-subscriber = "0.3.20"
 tower-http = { version = "0.6.6", features = ["full"] }
 tower = { version = "0.5.2", features = ["full"] }
