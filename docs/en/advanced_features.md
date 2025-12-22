@@ -1,14 +1,15 @@
-# 高级特性
+# Advanced Features
 
-本文档介绍 Miko 框架的高级功能，包括自动路由注册、静态文件服务、文件上传和 Trace ID 追踪系统。
+This document introduces the advanced features of the Miko framework, including automatic route registration, static
+file services, file uploads, and the Trace ID tracking system.
 
-## 自动路由注册
+## Automatic Route Registration
 
-> **需要 `auto` feature**
+> **Requires `auto` feature**
 
-使用 `#[miko]` 宏可以自动收集和注册所有路由，无需手动添加：
+Using the `#[miko]` macro can automatically collect and register all routes, eliminating the need for manual addition:
 
-### 基础用法
+### Basic Usage
 
 ```rust
 use miko::*;
@@ -29,30 +30,30 @@ async fn create_user(Json(data): Json<serde_json::Value>) -> StatusCode {
     StatusCode::CREATED
 }
 
-// 自动注册所有路由
+// Automatically register all routes
 #[miko]
 async fn main() {
     println!("🚀 Server running on http://localhost:8080");
 }
 ```
 
-### `#[miko]` 宏做了什么
+### What the `#[miko]` macro does
 
-`#[miko]` 宏会展开为：
+The `#[miko]` macro expands to:
 
 ```rust
 #[tokio::main]
 async fn main() {
-    // 1. 初始化依赖注入容器
+    // 1. Initialize the dependency injection container
     miko::auto::init_container().await;
 
-    // 2. 加载配置文件 (config.toml + config.{dev/prod}.toml)
+    // 2. Load configuration files (config.toml + config.{dev/prod}.toml)
     let config = miko::app::ApplicationConfig::load();
 
-    // 3. 收集所有 #[get]、#[post] 等宏标记的路由
+    // 3. Collect all routes marked with macros like #[get], #[post]
     let router = miko::auto::collect_routes();
 
-    // 4. 创建并运行应用
+    // 4. Create and run the application
     miko::app::Application::new(config, router)
         .run()
         .await
@@ -60,9 +61,9 @@ async fn main() {
 }
 ```
 
-### 手动控制
+### Manual Control
 
-如果需要更多控制，可以不使用 `#[miko]` 宏：
+If you need more control, you can choose not to use the `#[miko]` macro:
 
 ```rust
 use miko::*;
@@ -76,30 +77,30 @@ async fn index() -> &'static str {
 
 #[tokio::main]
 async fn main() {
-    // 手动初始化
+    // Manual initialization
     init_container().await;
 
-    // 自定义配置
+    // Custom configuration
     let mut config = ApplicationConfig::default();
     config.port = 9000;
 
-    // 手动收集路由
+    // Manually collect routes
     let router = miko::auto::collect_routes();
 
-    // 添加额外的中间件
+    // Add extra middleware
     let router = router.layer(/* ... */);
 
     Application::new(config, router).run().await.unwrap();
 }
 ```
 
-## 静态文件服务
+## Static File Service
 
-> **需要 `ext` feature**
+> **Requires `ext` feature**
 
-Miko 提供了静态文件服务功能，支持目录映射和 SPA 应用。
+Miko provides static file service capabilities, supporting directory mapping and SPA (Single Page Application) fallback.
 
-### 基础用法
+### Basic Usage
 
 ```rust
 use miko::*;
@@ -108,43 +109,45 @@ use miko::ext::static_svc::StaticSvc;
 
 #[miko]
 async fn main() {
-    // 挂载静态文件目录
+    // Mount a static file directory
     router.nest_service("/static", StaticSvc::builder("public").build());
 
     println!("📁 Static files at http://localhost:8080/static/");
 }
 ```
 
-访问示例：
+Access examples:
+
 - `/static/index.html` → `public/index.html`
 - `/static/css/style.css` → `public/css/style.css`
 - `/static/images/logo.png` → `public/images/logo.png`
 
-### SPA 模式
+### SPA Mode
 
-对于 Vue/React 等单页应用，启用 SPA 回退：
+For Single Page Applications like Vue or React, enable SPA fallback:
 
 ```rust
 use miko::ext::static_svc::StaticSvc;
 
 #[miko]
 async fn main() {
-    // 所有未匹配的路由都返回 index.html
+    // All unmatched routes return index.html
     router.nest_service(
         "/",
         StaticSvc::builder("dist")
-            .spa_fallback(true)  // 启用 SPA 回退
+            .spa_fallback(true)  // Enable SPA fallback
             .build()
     );
 }
 ```
 
-这样配置后：
+With this configuration:
+
 - `/` → `dist/index.html`
-- `/about` → `dist/index.html` (由前端路由处理)
+- `/about` → `dist/index.html` (handled by frontend routing)
 - `/static/app.js` → `dist/static/app.js`
 
-### 完整配置
+### Full Configuration
 
 ```rust
 use miko::ext::static_svc::StaticSvc;
@@ -156,16 +159,16 @@ async fn api_users() -> Json<Vec<String>> {
 
 #[miko]
 async fn main() {
-    // API 路由优先级更高
-    // （路由在静态服务之前定义）
+    // API routes have higher priority
+    // (Routes defined before static services)
 
-    // 静态文件服务
+    // Static file service
     router.nest_service(
         "/assets",
         StaticSvc::builder("public/assets").build()
     );
 
-    // SPA 应用（放在最后，作为兜底）
+    // SPA Application (placed last as a catch-all)
     router.nest_service(
         "/",
         StaticSvc::builder("public")
@@ -178,27 +181,27 @@ async fn main() {
 }
 ```
 
-### 安全性
+### Security
 
-StaticSvc 会自动防止路径遍历攻击：
+`StaticSvc` automatically prevents path traversal attacks:
 
 ```rust
-// ❌ 这些请求会被阻止
+// ❌ These requests will be blocked
 // /static/../../../etc/passwd
 // /static/..%2F..%2Fetc%2Fpasswd
 
-// ✅ 只能访问指定目录下的文件
+// ✅ Only files within the specified directory can be accessed
 // /static/style.css
 // /static/images/logo.png
 ```
 
-## 文件上传
+## File Upload
 
-> **需要 `ext` feature**
+> **Requires `ext` feature**
 
-Miko 提供了便捷的文件上传服务。
+Miko provides a convenient file upload service.
 
-### 使用 Uploader 服务
+### Using the Uploader Service
 
 ```rust
 use miko::*;
@@ -207,11 +210,11 @@ use miko::ext::uploader::{Uploader, DiskStorage, DiskStorageConfig};
 
 #[miko]
 async fn main() {
-    // 挂载单文件上传服务
+    // Mount a single file upload service
     router.service(
         "/upload",
         Uploader::single(DiskStorage::new(
-            "uploads",                                    // 保存目录
+            "uploads",                                    // Save directory
             DiskStorageConfig::default().max_size(50 * 1024 * 1024)  // 50MB
         ))
     );
@@ -220,38 +223,39 @@ async fn main() {
 }
 ```
 
-### DiskStorageConfig 配置
+### `DiskStorageConfig` Configuration
 
 ```rust
 use miko::ext::uploader::{DiskStorage, DiskStorageConfig};
 
 let storage = DiskStorage::new(
-    "uploads",
-    DiskStorageConfig::default()
-        .max_size(10 * 1024 * 1024)  // 最大 10MB
-        .allowed_extensions(vec!["jpg".into(), "png".into(), "pdf".into()])
-        .allowed_mime_types(vec!["image/jpeg".into(), "image/png".into()])
-        .filename_mapper(|original_name| {
-            // 自定义文件名生成
-            format!("{}_{}", chrono::Utc::now().timestamp(), original_name)
-        })
+"uploads",
+DiskStorageConfig::default ()
+.max_size(10 * 1024 * 1024)  // Max 10MB
+.allowed_extensions(vec!["jpg".into(), "png".into(), "pdf".into()])
+.allowed_mime_types(vec!["image/jpeg".into(), "image/png".into()])
+.filename_mapper( | original_name| {
+// Custom filename generation
+format ! ("{}_{}", chrono::Utc::now().timestamp(), original_name)
+})
 );
 ```
 
-### 使用 MultipartResult
+### Using `MultipartResult`
 
-更灵活的方式是使用 `MultipartResult` 提取器：
+A more flexible way is using the `MultipartResult` extractor:
 
 ```rust
 use miko::{*, macros::*, extractor::multipart::MultipartResult};
 
 #[post("/upload")]
-async fn upload(multipart: MultipartResult) -> AppResult<Json<serde_json::Value>> {
+async fn upload(mut multipart: MultipartResult) -> AppResult<Json<serde_json::Value>> {
     let mut uploaded = vec![];
 
-    for (field_name, files) in &multipart.files {
+    // Note: iterating by value to take ownership if read_and_drop_file is needed
+    for (field_name, files) in multipart.files {
         for file in files {
-            // 验证文件类型
+            // Validate file type
             if let Some(mime) = &file.content_type {
                 if !mime.type_().as_str().starts_with("image/") {
                     return Err(AppError::BadRequest(
@@ -260,7 +264,7 @@ async fn upload(multipart: MultipartResult) -> AppResult<Json<serde_json::Value>
                 }
             }
 
-            // 验证文件大小
+            // Validate file size
             const MAX_SIZE: usize = 5 * 1024 * 1024;  // 5MB
             if file.size > MAX_SIZE {
                 return Err(AppError::BadRequest(
@@ -268,7 +272,7 @@ async fn upload(multipart: MultipartResult) -> AppResult<Json<serde_json::Value>
                 ));
             }
 
-            // 保存文件
+            // Save file
             let dest = format!("uploads/{}", file.filename);
             file.linker.transfer_to(&dest).await?;
 
@@ -288,7 +292,7 @@ async fn upload(multipart: MultipartResult) -> AppResult<Json<serde_json::Value>
 }
 ```
 
-### 图片上传示例
+### Image Upload Example
 
 ```rust
 use miko::{*, macros::*, extractor::multipart::MultipartResult};
@@ -296,25 +300,25 @@ use image::ImageFormat;
 
 #[post("/upload-image")]
 async fn upload_image(mut multipart: MultipartResult) -> AppResult<Json<serde_json::Value>> {
-   // 使用 remove 获取文件所有权，因为 read_and_drop_file 需要消费文件
-   if let Some(files) = multipart.files.remove("image") {
+    // Use remove to take ownership of files, as read_and_drop_file consumes them
+    if let Some(files) = multipart.files.remove("image") {
         for file in files {
-            // 验证 MIME 类型
+            // Validate MIME type
             if let Some(mime) = &file.content_type {
                 if mime.type_().as_str() != "image" {
                     return Err(AppError::BadRequest("Not an image file".into()));
                 }
             }
 
-            // 读取图片并验证
-           let bytes = file.linker.read_and_drop_file().await?;
+            // Read image and validate
+            let bytes = file.linker.read_and_drop_file().await?;
             let img = image::load_from_memory(&bytes)
                 .map_err(|e| AppError::BadRequest(format!("Invalid image: {}", e)))?;
 
-            // 生成缩略图
+            // Generate thumbnail
             let thumbnail = img.resize(200, 200, image::imageops::FilterType::Lanczos3);
 
-            // 保存原图和缩略图
+            // Save original and thumbnail
             let filename = format!("{}_{}", chrono::Utc::now().timestamp(), file.filename);
             let thumb_filename = format!("thumb_{}", filename);
 
@@ -336,14 +340,15 @@ async fn upload_image(mut multipart: MultipartResult) -> AppResult<Json<serde_js
 }
 ```
 
-### 前端示例
+### Frontend Example
 
-HTML 表单：
+HTML Form:
 
 ```html
+
 <form action="/upload" method="POST" enctype="multipart/form-data">
-    <input type="file" name="file" accept="image/*" required>
-    <button type="submit">Upload</button>
+  <input type="file" name="file" accept="image/*" required>
+  <button type="submit">Upload</button>
 </form>
 ```
 
@@ -351,26 +356,26 @@ JavaScript Fetch:
 
 ```javascript
 async function uploadFile(file) {
-    const formData = new FormData();
-    formData.append('file', file);
+  const formData = new FormData();
+  formData.append('file', file);
 
-    const response = await fetch('/upload', {
-        method: 'POST',
-        body: formData
-    });
+  const response = await fetch('/upload', {
+    method: 'POST',
+    body: formData
+  });
 
-    const result = await response.json();
-    console.log('Uploaded:', result);
+  const result = await response.json();
+  console.log('Uploaded:', result);
 }
 ```
 
-## Trace ID 追踪
+## Trace ID Tracking
 
-Miko 提供了自动 Trace ID 系统，用于追踪和关联请求。
+Miko provides an automatic Trace ID system for tracking and correlating requests.
 
-### 自动 Trace ID
+### Automatic Trace ID
 
-所有错误响应都会自动包含 `trace_id` 字段：
+All error responses will automatically include a `trace_id` field:
 
 ```rust
 use miko::*;
@@ -381,7 +386,7 @@ async fn error_handler() -> AppResult<String> {
     Err(AppError::NotFound("Resource not found".into()))
 }
 
-// 响应示例：
+// Example Response:
 // {
 //   "status": 404,
 //   "error": "NOT_FOUND",
@@ -391,51 +396,51 @@ async fn error_handler() -> AppResult<String> {
 // }
 ```
 
-### Trace ID 来源
+### Trace ID Sources
 
-框架会按以下优先级获取 Trace ID：
+The framework retrieves the Trace ID according to the following priority:
 
-1. **请求头 `x-trace-id`**
-2. **请求头 `x-request-id`**
-3. **自动生成 UUID**
+1. Request header `x-trace-id`
+2. Request header `x-request-id`
+3. Automatically generated UUID
 
 ```bash
-# 使用自定义 Trace ID
+# Using custom Trace ID
 curl -H "x-trace-id: my-custom-trace-123" http://localhost:8080/api
 
-# 自动生成 Trace ID
+# Automatically generating Trace ID
 curl http://localhost:8080/api
 ```
 
-### 手动使用 Trace ID
+### Manually Using Trace ID
 
-可以在代码中手动获取和设置 Trace ID：
+You can manually get and set the Trace ID in your code:
 
 ```rust
 use miko::error::{get_trace_id, set_trace_id};
 
 #[get("/api/data")]
 async fn get_data() -> AppResult<String> {
-    // 获取当前请求的 Trace ID
+    // Get the Trace ID of the current request
     if let Some(trace_id) = get_trace_id() {
         println!("Processing request: {}", trace_id);
 
-        // 记录到日志系统
+        // Record to log system
         tracing::info!(trace_id = %trace_id, "Fetching data");
     }
 
-    // 业务逻辑
+    // Business logic
     Ok("Data".to_string())
 }
 ```
 
-### 中间件中使用 Trace ID
+### Using Trace ID in Middleware
 
 ```rust
 use miko::error::{get_trace_id, set_trace_id};
 use tower::{Layer, Service};
 
-// 自定义中间件记录 Trace ID
+// Custom middleware to record Trace ID
 #[derive(Clone)]
 struct TraceLayer;
 
@@ -454,7 +459,7 @@ struct TraceMiddleware<S> {
 
 impl<S, ReqBody, ResBody> Service<Request<ReqBody>> for TraceMiddleware<S>
 where
-    S: Service<Request<ReqBody>, Response = Response<ResBody>>,
+    S: Service<Request<ReqBody>, Response=Response<ResBody>>,
 {
     type Response = S::Response;
     type Error = S::Error;
@@ -465,7 +470,7 @@ where
     }
 
     fn call(&mut self, request: Request<ReqBody>) -> Self::Future {
-        // 从请求头获取或生成 Trace ID
+        // Get or generate Trace ID from request header
         let trace_id = request
             .headers()
             .get("x-trace-id")
@@ -474,7 +479,7 @@ where
             .map(|s| s.to_string())
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
-        // 设置到 thread-local
+        // Set to thread-local
         set_trace_id(Some(trace_id.clone()));
 
         tracing::info!(
@@ -488,48 +493,51 @@ where
     }
 }
 
-// 使用
+// Usage
 #[miko]
 async fn main() {
     router.layer(TraceLayer);
 }
 ```
 
-### API 文档
+### API Documentation
 
-**Trace ID 相关函数**：
+**Trace ID related functions**:
 
 ```rust
-// 获取当前请求的 Trace ID
+// Get the current request's Trace ID
 pub fn get_trace_id() -> Option<String>
 
-// 设置当前请求的 Trace ID
+// Set the current request's Trace ID
 pub fn set_trace_id(trace_id: Option<String>)
 
-// 清除当前请求的 Trace ID
+// Clear the current request's Trace ID
 pub fn clear_trace_id()
 ```
 
-## 优雅停机 (Graceful Shutdown)
+## Graceful Shutdown
 
-Miko 框架内置了生产级的优雅停机机制，确保在服务停止时不会强制中断正在处理的请求。
+The Miko framework has a built-in production-grade graceful shutdown mechanism, ensuring that active requests are not
+forcibly terminated when the service stops.
 
-### 工作原理
+### How it Works
 
-当应用启动后，`Application::run` 会自动监听系统的终止信号（Linux/macOS 的 `SIGTERM`/`SIGINT`，Windows 的 `Ctrl+C`）。
+Once the application starts, `Application::run` automatically listens for system termination signals (`SIGTERM`/`SIGINT`
+on Linux/macOS, `Ctrl+C` on Windows).
 
-当收到信号时：
+When a signal is received:
 
-1. **停止接收新连接**：服务器立即停止 `accept` 新的 TCP 连接。
-2. **通知现有连接**：向所有正在处理请求的连接发送停机信号。
-    * 对于 HTTP/1.1，会在响应头添加 `Connection: close`。
-    * 对于 HTTP/2，会发送 `GOAWAY` 帧。
-3. **等待请求完成**：服务器会等待所有活跃请求处理完毕。
-4. **强制超时**：如果超过默认的 **30秒** 仍有请求未完成，服务器将强制关闭并退出，防止进程僵死。
+1. **Stop Accepting New Connections**: The server immediately stops `accept`-ing new TCP connections.
+2. **Notify Existing Connections**: A shutdown signal is sent to all connections currently processing requests.
+    * For HTTP/1.1, a `Connection: close` header is added to the response.
+    * For HTTP/2, a `GOAWAY` frame is sent.
+3. **Wait for Request Completion**: The server waits for all active requests to finish processing.
+4. **Hard Timeout**: If requests are still incomplete after a default **30-second** period, the server will force a
+   shutdown to prevent the process from hanging.
 
-### 示例代码
+### Example Code
 
-你可以编写一个模拟慢请求的接口来测试此功能：
+You can write a slow request endpoint to test this feature:
 
 ```rust
 use miko::*;
@@ -538,7 +546,7 @@ use std::time::Duration;
 
 #[get("/slow")]
 async fn slow_handler() -> &'static str {
-    // 模拟耗时任务
+    // Simulate a time-consuming task
     tokio::time::sleep(Duration::from_secs(5)).await;
     "Task Finished!"
 }
@@ -547,14 +555,15 @@ async fn slow_handler() -> &'static str {
 async fn main() {
     let router = Router::new().get("/slow", slow_handler);
 
-    println!("按 Ctrl+C 停止服务，正在处理的请求会被执行完...");
+    println!("Press Ctrl+C to stop the server; active requests will finish processing...");
     Application::new_(router).run().await.unwrap();
 }
 ```
 
-### 验证方法
+### Verification Method
 
-1. 启动服务。
-2. 访问 `/slow` 接口。
-3. 立即在终端按 `Ctrl+C`。
-4. 你会发现服务没有立即退出，而是等待 `/slow` 请求返回结果后，才优雅地关闭。
+1. Start the server.
+2. Access the `/slow` endpoint.
+3. Immediately press `Ctrl+C` in the terminal.
+4. You will notice that the server does not exit immediately; it waits for the `/slow` request to return a result before
+   shutting down gracefully.
