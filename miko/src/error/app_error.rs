@@ -1,9 +1,9 @@
 use super::error_response::{ErrorResponse, ValidationErrorDetail};
 use crate::http::response::into_response::IntoResponse;
 use bytes::Bytes;
-use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Full};
 use hyper::{Response, StatusCode};
+use miko_core::Resp;
 use serde_json::json;
 use std::cell::RefCell;
 use std::convert::Infallible;
@@ -290,6 +290,24 @@ impl From<anyhow::Error> for AppError {
     }
 }
 
+impl From<Infallible> for AppError {
+    fn from(_: Infallible) -> Self {
+        Self::InternalServerError("Infallible error occurred".to_string())
+    }
+}
+
+impl From<Box<dyn std::error::Error>> for AppError {
+    fn from(err: Box<dyn std::error::Error>) -> Self {
+        Self::InternalServerError(err.to_string())
+    }
+}
+
+impl From<Box<dyn std::error::Error + Send + Sync>> for AppError {
+    fn from(err: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        Self::InternalServerError(err.to_string())
+    }
+}
+
 // ============ garde 验证库集成 ============
 #[cfg(feature = "validation")]
 impl From<garde::Report> for AppError {
@@ -310,7 +328,7 @@ impl From<garde::Report> for AppError {
 }
 
 impl IntoResponse for AppError {
-    fn into_response(self) -> Response<BoxBody<Bytes, Infallible>> {
+    fn into_response(self) -> Resp {
         let status = self.status_code();
         let error_code = self.error_code();
         let message = self.message();
@@ -338,24 +356,25 @@ impl IntoResponse for AppError {
                 .as_secs(),
         };
 
-        let body = match serde_json::to_string(&error_response) {
-            Ok(json) => json,
-            Err(_) => {
-                // 如果序列化失败，返回一个简单的错误
-                r#"{"error":"SERIALIZATION_ERROR","message":"Failed to serialize error response"}"#
-                    .to_string()
-            }
-        };
+        let body = serde_json::to_string(&error_response).unwrap_or_else(|_| {
+            // 如果序列化失败，返回一个简单的错误
+            r#"{"error":"SERIALIZATION_ERROR","message":"Failed to serialize error response"}"#
+                .to_string()
+        });
 
         Response::builder()
             .status(status)
             .header("Content-Type", "application/json")
-            .body(Full::new(Bytes::from(body)).boxed())
+            .body(Full::new(Bytes::from(body)).map_err(Into::into).boxed())
             .unwrap_or_else(|_| {
                 // 如果构建响应失败，返回一个最简单的 500 响应
                 Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Full::new(Bytes::from(r#"{"error":"INTERNAL_SERVER_ERROR"}"#)).boxed())
+                    .body(
+                        Full::new(Bytes::from(r#"{"error":"INTERNAL_SERVER_ERROR"}"#))
+                            .map_err(Into::into)
+                            .boxed(),
+                    )
                     .unwrap()
             })
     }

@@ -28,7 +28,7 @@ pub fn upgrade_websocket(req: &mut Req) -> Result<(Resp, OnUpgrade), anyhow::Err
         .header(CONNECTION, "Upgrade")
         .header(hyper::header::UPGRADE, "websocket")
         .header(hyper::header::SEC_WEBSOCKET_ACCEPT, accept)
-        .body(Empty::new().boxed())
+        .body(Empty::new().map_err(Into::into).boxed())
         .expect("failed to build response");
     let on_upgrade = hyper::upgrade::on(req);
     Ok((resp, on_upgrade))

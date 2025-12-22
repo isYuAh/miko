@@ -1,10 +1,7 @@
 #![allow(non_snake_case)]
 use crate::extractor::from_request::{FRFut, FRPFut, FromRequest, FromRequestParts};
 use crate::http::response::into_response::IntoResponse;
-use bytes::Bytes;
-use http_body_util::combinators::BoxBody;
 use hyper::http::request::Parts;
-use hyper::{Request, Response};
 use std::convert::Infallible;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -13,9 +10,7 @@ use std::task::{Context, Poll};
 use tower::Service;
 use tower::util::BoxCloneService;
 
-pub type RespBody = BoxBody<Bytes, Infallible>;
-pub type Resp = Response<RespBody>;
-pub type Req = Request<RespBody>;
+pub use miko_core::{Req, Resp, RespBody};
 /// 通用处理器接口（由框架自动为函数实现）
 pub trait Handler: Send + Sync + 'static {
     fn call(&self, req: Req) -> Pin<Box<dyn Future<Output = Resp> + Send>>;
@@ -283,5 +278,8 @@ impl Service<Req> for HandlerSvc {
 /// 将 Handler 转换为可克隆的 Tower Service
 pub fn handler_to_svc(h: DynHandler) -> HttpSvc<Req> {
     let svc = HandlerSvc::new(h);
-    BoxCloneService::new(svc)
+    let standardized = tower::ServiceBuilder::new()
+        .map_err(Into::into)
+        .service(svc);
+    BoxCloneService::new(standardized)
 }

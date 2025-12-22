@@ -1,6 +1,7 @@
 pub mod nested;
 pub mod router_svc;
 
+use crate::AppError;
 #[cfg(feature = "ext")]
 use crate::ext::static_svc::StaticSvcBuilder;
 use crate::extractor::{from_request::FromRequest, path_params::PathParams};
@@ -10,13 +11,13 @@ use crate::http::response::into_response::IntoResponse;
 use crate::router::router_svc::RouterSvc;
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
-use hyper::{Method, Request, body::Incoming};
+use hyper::{Method, Request, Response, body::Incoming};
 use matchit::Router as MRouter;
-use miko_core::{IntoMethods, encode_route};
+use miko_core::{BoxError, IntoMethods, MikoError, encode_route};
 use nested::NestLayer;
 #[cfg(feature = "ext")]
 use std::path::PathBuf;
-use std::{collections::HashMap, convert::Infallible, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use tower::{Layer, Service, util::BoxCloneService};
 
 /// 生成各 HTTP 方法的简化注册函数（如 get/post/...）
@@ -70,7 +71,7 @@ macro_rules! define_handle_service {
 /// Tower 兼容的请求与服务别名
 pub type HttpReq = Request<Incoming>;
 /// Tower 兼容的 Service 类型别名
-pub type HttpSvc<T = HttpReq> = BoxCloneService<T, Resp, Infallible>;
+pub type HttpSvc<T = HttpReq> = BoxCloneService<T, Resp, AppError>;
 
 type MikoLayer<T = Req> = Arc<dyn Fn(HttpSvc<T>) -> HttpSvc<T> + Send + Sync>;
 /// 路由器，负责注册路由、挂载中间件/服务并进行请求分发
@@ -125,15 +126,23 @@ impl<S: Send + Sync + 'static> Router<S> {
                         .unwrap()
                         .into_response()
                 }
-                Err(_e) => hyper::Response::builder()
+                Err(_e) => Response::builder()
                     .status(hyper::StatusCode::NOT_FOUND)
-                    .body(Full::new(Bytes::from("Not Found")).boxed())
+                    .body(
+                        Full::new(Bytes::from("Not Found"))
+                            .map_err(Into::into)
+                            .boxed(),
+                    )
                     .unwrap(),
             }
         } else {
-            hyper::Response::builder()
+            Response::builder()
                 .status(hyper::StatusCode::NOT_FOUND)
-                .body(Full::new(Bytes::from("Not Found")).boxed())
+                .body(
+                    Full::new(Bytes::from("Not Found"))
+                        .map_err(Into::into)
+                        .boxed(),
+                )
                 .unwrap()
         }
     }
@@ -338,15 +347,26 @@ impl<S: Send + Sync + 'static> Router<S> {
     }
 
     /// 追加一个中间件 Layer，稍后在 into_tower_service 时顺序应用
-    pub fn with_layer<L>(&mut self, layer: L) -> &mut Self
+    pub fn with_layer<L, B>(&mut self, layer: L) -> &mut Self
     where
         L: Layer<HttpSvc<Req>> + Send + Sync + 'static,
-        L::Service: Service<Req, Response = Resp, Error = Infallible> + Clone + Send + 'static,
+        L::Service: Service<Req, Response = Response<B>> + Clone + Send + 'static,
+        <L::Service as Service<Req>>::Error: Into<AppError> + Send + Sync + 'static,
         <L::Service as Service<Req>>::Future: Send + 'static,
+        B: http_body::Body<Data = Bytes> + Send + Sync + 'static,
+        B::Error: Into<BoxError>,
     {
         self.layers.push(Arc::new(move |svc: HttpSvc<Req>| {
             let wrapped = layer.layer(svc);
-            BoxCloneService::new(wrapped)
+            let standardized = tower::ServiceBuilder::new()
+                .map_response(|resp: Response<B>| {
+                    let (parts, body) = resp.into_parts();
+                    let body = body.map_err(|e| MikoError::from(e.into())).boxed();
+                    Response::from_parts(parts, body)
+                })
+                .map_err(Into::into)
+                .service(wrapped);
+            BoxCloneService::new(standardized)
         }));
         self
     }
@@ -354,7 +374,8 @@ impl<S: Send + Sync + 'static> Router<S> {
     /// 将路由器转换为 Tower Service，自动应用之前注册的 Layer
     pub fn into_tower_service(mut self) -> HttpSvc<Req> {
         let layers = std::mem::take(&mut self.layers);
-        let mut svc: HttpSvc<Req> = BoxCloneService::new(RouterSvc { router: self });
+        let router_svc = RouterSvc { router: self };
+        let mut svc: HttpSvc<Req> = BoxCloneService::new(router_svc);
         for apply in layers {
             svc = apply(svc);
         }

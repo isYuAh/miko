@@ -1,3 +1,4 @@
+use crate::IntoResponse;
 use crate::router::HttpSvc;
 use http_body_util::BodyExt;
 use hyper::Request;
@@ -28,8 +29,9 @@ impl Service<Request<Incoming>> for IncomingToInternal {
     fn call(&mut self, req_incoming: Request<Incoming>) -> Self::Future {
         let mut inner = self.inner.clone();
         Box::pin(async move {
-            let req: Req = req_incoming.map(|inc| inc.map_err(|_| unreachable!()).boxed());
-            inner.call(req).await
+            let req: Req = req_incoming.map(|inc| inc.map_err(Into::into).boxed());
+            let resp = inner.call(req).await.unwrap_or_else(|e| e.into_response());
+            Ok(resp)
         })
     }
 }

@@ -15,8 +15,8 @@ pub trait IntoResponse {
     fn into_response(self) -> Resp;
 }
 
-fn bytes_to_boxed(bytes: Bytes) -> RespBody {
-    Full::new(bytes).boxed()
+pub fn bytes_to_boxed(bytes: Bytes) -> RespBody {
+    Full::new(bytes).map_err(Into::into).boxed()
 }
 
 impl IntoResponse for String {
@@ -127,7 +127,7 @@ impl IntoResponse for () {
     fn into_response(self) -> Resp {
         Response::builder()
             .status(200)
-            .body(miko_core::fast_builder::box_empty_body())
+            .body(bytes_to_boxed(Bytes::new()))
             .unwrap()
     }
 }
@@ -136,7 +136,7 @@ impl IntoResponse for StatusCode {
     fn into_response(self) -> Resp {
         Response::builder()
             .status(self)
-            .body(miko_core::fast_builder::box_empty_body())
+            .body(bytes_to_boxed(Bytes::new()))
             .unwrap()
     }
 }

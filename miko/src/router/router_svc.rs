@@ -2,7 +2,6 @@ use crate::error::{clear_trace_id, set_trace_id};
 use crate::handler::{Req, Resp};
 use crate::router::Router;
 use crate::{AppError, IntoResponse};
-use std::convert::Infallible;
 use std::{
     future::Future,
     pin::Pin,
@@ -23,8 +22,8 @@ impl<S> Clone for RouterSvc<S> {
 
 impl<S: Send + Sync + 'static> Service<Req> for RouterSvc<S> {
     type Response = Resp;
-    type Error = Infallible;
-    type Future = Pin<Box<dyn Future<Output = Result<Resp, Infallible>> + Send>>;
+    type Error = AppError;
+    type Future = Pin<Box<dyn Future<Output = Result<Resp, AppError>> + Send>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
@@ -57,19 +56,29 @@ impl<S: Send + Sync + 'static> Service<Req> for RouterSvc<S> {
 
                 // 记录请求完成
                 let elapsed = start.elapsed();
-                let Ok(ref response) = resp;
-                tracing::debug!(
-                    method = %method,
-                    path = %path,
-                    trace_id = %trace_id,
-                    status = %response.status(),
-                    elapsed_ms = elapsed.as_millis(),
-                    "Request completed"
-                );
+                if let Ok(ref response) = resp {
+                    tracing::debug!(
+                        method = %method,
+                        path = %path,
+                        trace_id = %trace_id,
+                        status = %response.status(),
+                        elapsed_ms = elapsed.as_millis(),
+                        "Request completed"
+                    );
+                } else {
+                    tracing::debug!(
+                        method = %method,
+                        path = %path,
+                        trace_id = %trace_id,
+                        status = "500",
+                        elapsed_ms = elapsed.as_millis(),
+                        "Request completed with error"
+                    );
+                }
 
                 // 请求处理完成,清理 trace_id
                 clear_trace_id();
-                resp
+                Ok(resp.unwrap_or_else(|e| e.into_response()))
             }),
             None => Box::pin(async move {
                 let resp = AppError::NotFound("404 Not Found".to_string()).into_response();
