@@ -563,7 +563,65 @@ async fn main() {
 ### Verification Method
 
 1. Start the server.
+
 2. Access the `/slow` endpoint.
+
 3. Immediately press `Ctrl+C` in the terminal.
+
 4. You will notice that the server does not exit immediately; it waits for the `/slow` request to return a result before
    shutting down gracefully.
+
+## Panic Handling
+
+> **Requires `catch_panic` feature**
+
+
+
+Miko can capture `panic`s that occur in handler functions, preventing the service from crashing and returning a 500 JSON
+response instead.
+
+### How to Enable
+
+#### 1. Via Macro Attribute (Recommended)
+
+Add the `catch` attribute to the `#[miko]` macro:
+
+```rust
+
+#[miko(catch)]
+
+async fn main() {
+
+   // Global panic catching is enabled
+
+}
+
+```
+
+#### 2. Manual Enable
+
+If you are not using the macro, you can manually mount the middleware to the Router:
+
+```rust
+
+let mut router = Router::new();
+
+router.with_catch_panic();
+
+```
+
+### Response Format
+
+Once a panic is captured, the client will receive a response like this:
+
+```json
+
+{
+   "status": 500,
+   "error": "INTERNAL_SERVER_ERROR",
+   "message": "Panic occurred: [panic message]",
+   "trace_id": "...",
+   "timestamp": ...
+}
+
+```

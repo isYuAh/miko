@@ -96,7 +96,7 @@ impl_fn_once_tuple_all!();
 pub struct TypedHandler<F, A, S, M> {
     pub f: F,
     pub state: Arc<S>,
-    _marker: PhantomData<(A, M)>,
+    _marker: PhantomData<fn(A, M)>,
 }
 impl<F, A, S, M> TypedHandler<F, A, S, M> {
     /// 创建一个绑定了状态的 TypedHandler

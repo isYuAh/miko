@@ -71,6 +71,20 @@ pub fn miko(attr: TokenStream, item: TokenStream) -> TokenStream {
     } else {
         None
     };
+    let catch_panic = if str_attr_map.map.contains_key("catch") {
+        if cfg!(feature = "catch_panic") {
+            Some(quote! {
+                router.with_catch_panic();
+            })
+        } else {
+            return quote! {
+                compile_error!("`catch` attribute requires `catch_panic` feature to be enabled");
+            }
+            .into();
+        }
+    } else {
+        None
+    };
     let dep_init = if cfg!(feature = "auto") {
         quote! {
             ::miko::dependency_container::CONTAINER.get_or_init(|| async {
@@ -86,6 +100,7 @@ pub fn miko(attr: TokenStream, item: TokenStream) -> TokenStream {
             #set_panic_hook
             let mut _config = ::miko::app::config::ApplicationConfig::load_().unwrap_or_default();
             let mut router = ::miko::router::Router::new();
+            #catch_panic
             #dep_init
 
             #( #user_statements )*

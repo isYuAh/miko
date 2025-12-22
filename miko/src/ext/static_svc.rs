@@ -3,7 +3,7 @@ use crate::http::response::into_response::{IntoResponse, bytes_to_boxed};
 use crate::router::HttpSvc;
 use bytes::Bytes;
 use http_body_util::BodyExt;
-use hyper::{Method, Response, StatusCode, header};
+use hyper::{HeaderMap, Method, Response, StatusCode, header};
 use miko_core::fallible_stream_body::FallibleStreamBody;
 use miko_core::{Req, Resp, decode_path};
 use std::future::Future;
@@ -123,7 +123,7 @@ impl StaticSvc {
     async fn serve_file(
         path: &PathBuf,
         method: &Method,
-        req: &Req,
+        headers: &HeaderMap,
     ) -> Result<Resp, std::io::Error> {
         let mime = mime_guess::from_path(path).first_or_octet_stream();
         let content_type = if mime.type_() == mime_guess::mime::TEXT {
@@ -147,7 +147,7 @@ impl StaticSvc {
             format!("\"{:x}\"", file_size)
         };
 
-        if let Some(if_none_match) = req.headers().get(header::IF_NONE_MATCH)
+        if let Some(if_none_match) = headers.get(header::IF_NONE_MATCH)
             && let Ok(if_none_match_str) = if_none_match.to_str()
             && (if_none_match_str == etag || if_none_match_str == "*")
         {
@@ -169,7 +169,7 @@ impl StaticSvc {
         }
 
         // 处理 Range 请求
-        if let Some(range_header) = req.headers().get(header::RANGE)
+        if let Some(range_header) = headers.get(header::RANGE)
             && let Ok(range_str) = range_header.to_str()
         {
             match Self::parse_range(range_str, file_size) {
@@ -195,7 +195,9 @@ impl StaticSvc {
                     let limited_file = file.take(content_length);
                     let stream = ReaderStream::new(limited_file);
                     let body = FallibleStreamBody::with_size_hint(stream, content_length);
-                    return Ok(builder.body(body.map_err(Into::into).boxed()).unwrap());
+                    return Ok(builder
+                        .body(body.map_err(Into::into).boxed_unsync())
+                        .unwrap());
                 }
                 Err(()) => {
                     // Range 超出范围，返回 416 Range Not Satisfiable
@@ -222,7 +224,9 @@ impl StaticSvc {
         let file = File::open(path).await?;
         let stream = ReaderStream::new(file);
         let body = FallibleStreamBody::with_size_hint(stream, file_size);
-        Ok(builder.body(body.map_err(Into::into).boxed()).unwrap())
+        Ok(builder
+            .body(body.map_err(Into::into).boxed_unsync())
+            .unwrap())
     }
 }
 
@@ -318,6 +322,9 @@ impl Service<Req> for StaticSvc {
         let root = self.root.clone();
         let spa_fallback = self.spa_fallback;
         let mut path = self.resolve_path(req.uri().path());
+        let (parts, _body) = req.into_parts();
+        let method = parts.method;
+        let headers = parts.headers;
 
         let self_clone = self.clone();
         Box::pin(async move {
@@ -325,19 +332,19 @@ impl Service<Req> for StaticSvc {
                 path = index_path;
             }
 
-            match StaticSvc::serve_file(&path, req.method(), &req).await {
+            match StaticSvc::serve_file(&path, &method, &headers).await {
                 Ok(resp) => Ok(resp),
                 Err(e) => {
                     if spa_fallback
                         && e.kind() == std::io::ErrorKind::NotFound
                         && let Some(fallback_path) = self_clone.try_fallback_files(&root).await
                         && let Ok(resp) =
-                            StaticSvc::serve_file(&fallback_path, req.method(), &req).await
+                            StaticSvc::serve_file(&fallback_path, &method, &headers).await
                     {
                         return Ok(resp);
                     }
 
-                    Ok(crate::AppError::NotFound("File not found".to_string()).into_response())
+                    Ok(AppError::NotFound("File not found".to_string()).into_response())
                 }
             }
         })

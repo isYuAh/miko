@@ -131,7 +131,7 @@ impl<S: Send + Sync + 'static> Router<S> {
                     .body(
                         Full::new(Bytes::from("Not Found"))
                             .map_err(Into::into)
-                            .boxed(),
+                            .boxed_unsync(),
                     )
                     .unwrap(),
             }
@@ -141,7 +141,7 @@ impl<S: Send + Sync + 'static> Router<S> {
                 .body(
                     Full::new(Bytes::from("Not Found"))
                         .map_err(Into::into)
-                        .boxed(),
+                        .boxed_unsync(),
                 )
                 .unwrap()
         }
@@ -353,7 +353,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         L::Service: Service<Req, Response = Response<B>> + Clone + Send + 'static,
         <L::Service as Service<Req>>::Error: Into<AppError> + Send + Sync + 'static,
         <L::Service as Service<Req>>::Future: Send + 'static,
-        B: http_body::Body<Data = Bytes> + Send + Sync + 'static,
+        B: http_body::Body<Data = Bytes> + Send + 'static,
         B::Error: Into<BoxError>,
     {
         self.layers.push(Arc::new(move |svc: HttpSvc<Req>| {
@@ -361,7 +361,7 @@ impl<S: Send + Sync + 'static> Router<S> {
             let standardized = tower::ServiceBuilder::new()
                 .map_response(|resp: Response<B>| {
                     let (parts, body) = resp.into_parts();
-                    let body = body.map_err(|e| MikoError::from(e.into())).boxed();
+                    let body = body.map_err(|e| MikoError::from(e.into())).boxed_unsync();
                     Response::from_parts(parts, body)
                 })
                 .map_err(Into::into)
@@ -369,6 +369,15 @@ impl<S: Send + Sync + 'static> Router<S> {
             BoxCloneService::new(standardized)
         }));
         self
+    }
+
+    /// 开启捕获panic
+    #[cfg(feature = "catch_panic")]
+    pub fn with_catch_panic(&mut self) -> &mut Self {
+        use tower_http::catch_panic::CatchPanicLayer;
+        self.with_layer(CatchPanicLayer::custom(|payload| {
+            AppError::from_panic(payload).into_response()
+        }))
     }
 
     /// 将路由器转换为 Tower Service，自动应用之前注册的 Layer

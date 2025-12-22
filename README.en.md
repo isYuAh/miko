@@ -45,7 +45,7 @@ async fn hello() -> &'static str {
     "Hello, Miko!"
 }
 
-#[main]
+#[miko]
 async fn main() {
 }
 ```

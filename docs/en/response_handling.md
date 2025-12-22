@@ -336,7 +336,7 @@ async fn download_file(#[path] filename: String) -> AppResult<Response<BoxBody<B
         .status(200)
         .header("Content-Type", "application/octet-stream")
         .header("Content-Disposition", format!("attachment; filename=\"{}\"", filename))
-        .body(body.map_err(Into::into).boxed())
+        .body(body.map_err(Into::into).boxed_unsync())
         .unwrap())
 }
 ```
@@ -355,7 +355,7 @@ async fn get_image(#[path] id: u32) -> AppResult<Response<BoxBody<Bytes, MikoErr
 
     Ok(Response::builder()
         .header("Content-Type", "image/jpeg")
-        .body(Full::new(Bytes::from(data)).map_err(Into::into).boxed())
+        .body(Full::new(Bytes::from(data)).map_err(Into::into).boxed_unsync())
         .unwrap())
 }
 ```
@@ -415,7 +415,7 @@ impl<T: Serialize> IntoResponse for ApiResponse<T> {
         Response::builder()
             .status(StatusCode::OK)
             .header("Content-Type", "application/json")
-            .body(Full::new(Bytes::from(bytes)).map_err(Into::into).boxed())
+            .body(Full::new(Bytes::from(bytes)).map_err(Into::into).boxed_unsync())
             .unwrap()
     }
 }
@@ -478,7 +478,7 @@ async fn custom_response() -> Response<BoxBody<Bytes, MikoError>> {
         .status(StatusCode::OK)
         .header("X-Custom", "value")
         .header("Content-Type", "text/plain")
-        .body(Full::new(Bytes::from("Custom response")).map_err(Into::into).boxed())
+        .body(Full::new(Bytes::from("Custom response")).map_err(Into::into).boxed_unsync())
         .unwrap()
 }
 ```
