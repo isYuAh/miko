@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use http_body_util::combinators::BoxBody;
+use http_body_util::combinators::UnsyncBoxBody;
 use hyper::{Request, Response};
 use std::fmt;
 
@@ -85,7 +85,7 @@ pub enum HTTPStatusCode {
     InternalServerError = 500,
 }
 
-pub type RespBody = BoxBody<Bytes, MikoError>;
-pub type ReqBody = BoxBody<Bytes, MikoError>;
+pub type RespBody = UnsyncBoxBody<Bytes, MikoError>;
+pub type ReqBody = UnsyncBoxBody<Bytes, MikoError>;
 pub type Resp = Response<RespBody>;
 pub type Req = Request<ReqBody>;

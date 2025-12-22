@@ -509,7 +509,7 @@ async fn custom() -> impl IntoResponse {
     Response::builder()
         .status(StatusCode::OK)
         .header("X-Custom", "value")
-        .body(Full::new(Bytes::from("Hello")).map_err(Into::into).boxed())
+        .body(Full::new(Bytes::from("Hello")).map_err(Into::into).boxed_unsync())
         .unwrap()
 }
 ```

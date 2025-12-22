@@ -90,7 +90,7 @@ impl LayerExt<HttpSvc<Req>> for HttpSvc<Req> {
             .layer(self)
             .map_response(|resp| {
                 let (parts, body) = resp.into_parts();
-                let body = body.map_err(|e| MikoError::from(e.into())).boxed();
+                let body = body.map_err(|e| MikoError::from(e.into())).boxed_unsync();
                 Response::from_parts(parts, body)
             })
             .map_err(Into::into);

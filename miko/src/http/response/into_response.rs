@@ -16,7 +16,7 @@ pub trait IntoResponse {
 }
 
 pub fn bytes_to_boxed(bytes: Bytes) -> RespBody {
-    Full::new(bytes).map_err(Into::into).boxed()
+    Full::new(bytes).map_err(Into::into).boxed_unsync()
 }
 
 impl IntoResponse for String {
@@ -87,7 +87,7 @@ where
     E: std::fmt::Debug + Send + 'static,
 {
     fn into_response(self) -> Resp {
-        let body = BodyExt::boxed(StreamBody::new(self.0.map(|chunk| match chunk {
+        let body = BodyExt::boxed_unsync(StreamBody::new(self.0.map(|chunk| match chunk {
             Ok(b) => Ok(Frame::data(b)),
             Err(e) => {
                 tracing::error!("SSE stream error: {:?}", e);

@@ -14,7 +14,7 @@ pub type FRPFut<'a, T> = std::pin::Pin<Box<dyn Future<Output = Result<T, AppErro
 /// 基于完整 Request 的提取器
 ///
 /// 实现该 trait 可以自定义从请求中提取参数的逻辑。通常用于需要读取 Body 的场景。
-pub trait FromRequest<S = (), M = ReqTag>: Send + Sync + 'static {
+pub trait FromRequest<S = (), M = ReqTag>: Send + 'static {
     fn from_request(req: Req, state: Arc<S>) -> FRFut<Self>
     where
         Self: Sized;
@@ -23,7 +23,7 @@ pub trait FromRequest<S = (), M = ReqTag>: Send + Sync + 'static {
 /// 基于 request::Parts 的提取器
 ///
 /// 仅能访问方法、路径、头部、扩展等，不消耗 Body，适合 Header/Query/Path 等提取。
-pub trait FromRequestParts<S = ()>: Send + Sync + 'static {
+pub trait FromRequestParts<S = ()>: Send + 'static {
     fn from_request_parts(req: &mut Parts, state: Arc<S>) -> FRPFut<'_, Self>
     where
         Self: Sized;

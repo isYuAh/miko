@@ -22,4 +22,5 @@ utoipa = { version = "5", optional = true }
 [features]
 auto = []
 utoipa = ["dep:utoipa"]
-full = ["auto", "utoipa"]
+catch_panic = []
+full = ["auto", "utoipa", "catch_panic"]

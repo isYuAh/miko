@@ -4,6 +4,7 @@
 //!
 //! 运行: cargo run --example utoipa_demo --features full,utoipa
 //! 访问: http://localhost:3000/scalar
+#![allow(unused)]
 
 use miko::extractor::Json;
 use miko::http::response::into_response::{Html, IntoResponse};

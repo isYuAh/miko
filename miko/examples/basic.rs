@@ -295,7 +295,9 @@ struct AnotherAppState {
     pub description: String,
 }
 
-#[miko(sse)] // the sse attribute can set a panic hook that ignore error caused by `or_break()`
+#[miko(sse, catch)]
+// the sse attribute can set a panic hook that ignore error caused by `or_break()`
+// the catch attribute can catch panics in handlers and convert them to 500 responses
 async fn main() {
     tracing_subscriber::fmt::init(); // initialize logging (optional)
     let mut no_macro_router = Router::new();

@@ -5,6 +5,7 @@ use http_body_util::{BodyExt, Full};
 use hyper::{Response, StatusCode};
 use miko_core::Resp;
 use serde_json::json;
+use std::any::Any;
 use std::cell::RefCell;
 use std::convert::Infallible;
 use std::fmt;
@@ -245,6 +246,18 @@ impl AppError {
             _ => None,
         }
     }
+
+    /// 从panic转换
+    pub fn from_panic(payload: Box<dyn Any + Send>) -> Self {
+        let msg = if let Some(s) = payload.downcast_ref::<&str>() {
+            s.to_string()
+        } else if let Some(s) = payload.downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "Unknown panic".to_string()
+        };
+        Self::InternalServerError(format!("Server panicked: {}", msg))
+    }
 }
 
 impl fmt::Display for AppError {
@@ -365,7 +378,11 @@ impl IntoResponse for AppError {
         Response::builder()
             .status(status)
             .header("Content-Type", "application/json")
-            .body(Full::new(Bytes::from(body)).map_err(Into::into).boxed())
+            .body(
+                Full::new(Bytes::from(body))
+                    .map_err(Into::into)
+                    .boxed_unsync(),
+            )
             .unwrap_or_else(|_| {
                 // 如果构建响应失败，返回一个最简单的 500 响应
                 Response::builder()
@@ -373,7 +390,7 @@ impl IntoResponse for AppError {
                     .body(
                         Full::new(Bytes::from(r#"{"error":"INTERNAL_SERVER_ERROR"}"#))
                             .map_err(Into::into)
-                            .boxed(),
+                            .boxed_unsync(),
                     )
                     .unwrap()
             })
