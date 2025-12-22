@@ -1,4 +1,4 @@
-use crate::error::{clear_trace_id, set_trace_id};
+use crate::error::app_error::TRACE_ID;
 use crate::handler::{Req, Resp};
 use crate::router::Router;
 use crate::{AppError, IntoResponse};
@@ -37,26 +37,28 @@ impl<S: Send + Sync + 'static> Service<Req> for RouterSvc<S> {
         // 自动设置 trace_id
         // 优先从请求头获取,如果没有则生成新的
         let trace_id = extract_or_generate_trace_id(&req);
-        set_trace_id(Some(trace_id.clone()));
-
-        // 记录请求开始
-        tracing::debug!(
-            method = %method,
-            path = %path,
-            trace_id = %trace_id,
-            "Request started"
-        );
+        let trace_id_clone = trace_id.clone();
 
         let start = std::time::Instant::now();
 
-        match result {
-            Some((mut handler, params)) => Box::pin(async move {
-                req.extensions_mut().insert(params);
-                let resp = handler.call(req).await;
-
-                // 记录请求完成
-                let elapsed = start.elapsed();
-                if let Ok(ref response) = resp {
+        let task_future = async move {
+            tracing::debug!(
+                method = %method,
+                path = %path,
+                trace_id = %trace_id,
+                "Request started"
+            );
+            let resp_result = match result {
+                Some((mut handler, params)) => {
+                    req.extensions_mut().insert(params);
+                    handler.call(req).await
+                }
+                None => Ok(AppError::NotFound("404 Not Found".to_string()).into_response()),
+            };
+            // 记录请求完成
+            let elapsed = start.elapsed();
+            match &resp_result {
+                Ok(response) => {
                     tracing::debug!(
                         method = %method,
                         path = %path,
@@ -65,40 +67,22 @@ impl<S: Send + Sync + 'static> Service<Req> for RouterSvc<S> {
                         elapsed_ms = elapsed.as_millis(),
                         "Request completed"
                     );
-                } else {
+                }
+                Err(err) => {
                     tracing::debug!(
                         method = %method,
                         path = %path,
                         trace_id = %trace_id,
                         status = "500",
                         elapsed_ms = elapsed.as_millis(),
+                        err = ?err,
                         "Request completed with error"
                     );
                 }
-
-                // 请求处理完成,清理 trace_id
-                clear_trace_id();
-                Ok(resp.unwrap_or_else(|e| e.into_response()))
-            }),
-            None => Box::pin(async move {
-                let resp = AppError::NotFound("404 Not Found".to_string()).into_response();
-
-                // 记录请求完成(404)
-                let elapsed = start.elapsed();
-                tracing::debug!(
-                    method = %method,
-                    path = %path,
-                    trace_id = %trace_id,
-                    status = 404,
-                    elapsed_ms = elapsed.as_millis(),
-                    "Request completed"
-                );
-
-                // 清理 trace_id
-                clear_trace_id();
-                Ok(resp)
-            }),
-        }
+            }
+            Ok(resp_result.unwrap_or_else(|e| e.into_response()))
+        };
+        Box::pin(TRACE_ID.scope(trace_id_clone, task_future))
     }
 }
 

@@ -6,45 +6,19 @@ use hyper::{Response, StatusCode};
 use miko_core::Resp;
 use serde_json::json;
 use std::any::Any;
-use std::cell::RefCell;
 use std::convert::Infallible;
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::task_local;
 
-thread_local! {
+task_local! {
     /// 用于存储当前请求的 trace_id
-    static TRACE_ID: RefCell<Option<String>> = const { RefCell::new(None) };
-}
-
-/// 设置当前请求的 trace_id
-///
-/// 通常在中间件或请求处理开始时调用
-///
-/// # Example
-/// ```no_run
-/// use miko::error::set_trace_id;
-///
-/// // 在中间件中设置
-/// set_trace_id(Some("req-12345".to_string()));
-/// ```
-pub fn set_trace_id(trace_id: Option<String>) {
-    TRACE_ID.with(|id| {
-        *id.borrow_mut() = trace_id;
-    });
+    pub static TRACE_ID: String;
 }
 
 /// 获取当前请求的 trace_id
 pub fn get_trace_id() -> Option<String> {
-    TRACE_ID.with(|id| id.borrow().clone())
-}
-
-/// 清除当前请求的 trace_id
-///
-/// 通常在请求处理结束时调用
-pub fn clear_trace_id() {
-    TRACE_ID.with(|id| {
-        *id.borrow_mut() = None;
-    });
+    TRACE_ID.try_with(|id| id.clone()).ok()
 }
 
 /// 框架统一错误类型

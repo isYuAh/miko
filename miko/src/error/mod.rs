@@ -5,6 +5,6 @@ pub mod app_error;
 pub mod error_response;
 pub mod result;
 
-pub use app_error::{AppError, clear_trace_id, get_trace_id, set_trace_id};
+pub use app_error::{AppError, get_trace_id};
 pub use error_response::{ErrorResponse, ValidationErrorDetail};
 pub use result::AppResult;
