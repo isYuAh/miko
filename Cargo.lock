@@ -780,7 +780,7 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
 name = "miko"
-version = "0.3.14"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "bytes",
@@ -817,7 +817,7 @@ dependencies = [
 
 [[package]]
 name = "miko-core"
-version = "0.3.14"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "bytes",
@@ -831,7 +831,7 @@ dependencies = [
 
 [[package]]
 name = "miko-macros"
-version = "0.3.14"
+version = "0.4.0"
 dependencies = [
  "hyper",
  "miko-core",
