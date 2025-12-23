@@ -1,129 +1,84 @@
 # Configuration Management
 
-Miko provides a TOML-based configuration system, supporting environment separation and configuration injection.
+In v0.8.0, Miko introduced a brand new configuration system based on the robust `config` crate, supporting multi-format
+configuration files (TOML, YAML, JSON, JSON5), environment variable injection, and default values.
 
 ## Configuration Files
 
-### Basic Configuration
+### Supported Formats
 
-Create `config.toml` in the project root:
+Miko enables TOML support by default. You can enable other formats via features:
 
 ```toml
-[application]
-addr = "0.0.0.0"
+[dependencies]
+# Default support for TOML
+miko = "0.8"
+
+# Enable YAML support
+miko = { version = "0.8", features = ["config-yaml"] }
+```
+
+### Basic Configuration
+
+Create `config.toml` (or `config.yaml`, `config.json`, etc.) in the project root:
+
+```toml
+# [server] replaces the old [application] section
+[server]
+host = "0.0.0.0"
 port = 8080
 
 [database]
 url = "postgres://localhost/mydb"
 max_connections = 10
 
-[redis]
-url = "redis://localhost"
-timeout = 5
-
 [app]
 name = "My Application"
-version = "1.0.0"
 debug = false
 ```
 
-### Environment-specific Configuration
+### Environment Configuration
 
-Miko supports environment-specific configuration files:
+Miko automatically loads additional configuration files based on the runtime environment, overriding the basic
+configuration:
 
-- `config.dev.toml` - Development environment (debug mode)
-- `config.prod.toml` - Production environment (release mode)
+- **Development** (`debug` build or `CONFIG_ENV=dev`): Loads `config.dev.{ext}`
+- **Production** (`release` build or `CONFIG_ENV=prod`): Loads `config.prod.{ext}`
 
-Environment configuration will be automatically merged with the basic configuration, with environment settings having
-higher priority.
-
-**config.dev.toml**:
+For example, `config.dev.toml`:
 
 ```toml
-[application]
+[server]
 port = 3000
 
 [app]
 debug = true
 ```
 
-**config.prod.toml**:
+### Environment Variables
 
-```toml
-[database]
-url = "postgres://prod-server/mydb"
-max_connections = 50
+Miko supports overriding configuration via environment variables. Variables must start with `MIKO__`, using double
+underscores `__` as separators.
 
-[app]
-debug = false
-```
+Examples:
+
+- `MIKO__SERVER__PORT=9090` overrides `server.port`
+- `MIKO__DATABASE__URL=...` overrides `database.url`
 
 ## Automatic Loading
 
-When using the `#[miko]` macro, configuration is automatically loaded:
+When using the `#[miko]` macro, the configuration system is automatically initialized:
 
 ```rust
 use miko::*;
 use miko::macros::*;
 
-#[get("/")]
-async fn index() -> &'static str {
-    "Hello"
-}
-
 #[miko]
 async fn main() {
-    // Configuration automatically loaded
-    // router is available
-}
-```
-
-The `#[miko]` macro will:
-
-1. Load `config.toml`.
-2. Merge `config.dev.toml` or `config.prod.toml` based on the compilation mode.
-3. Store the configuration in global variables.
-
-## Manual Loading
-
-If you don't use the `#[miko]` macro, there are two ways to manually load configuration:
-
-### Method 1: Using `Application::new_` (Recommended)
-
-`Application::new_` automatically loads configuration files:
-
-```rust
-use miko::{Router, Application};
-
-#[tokio::main]
-async fn main() {
-    let router = Router::new()
-        .get("/", handler);
-
-    // Automatically loads config.toml and environment-specific configs
-    Application::new_(router).run().await.unwrap();
-}
-```
-
-### Method 2: Manual Loading
-
-If you need to access configuration before creating the application:
-
-```rust
-use miko::app::config::ApplicationConfig;
-use miko::{Router, Application};
-
-#[tokio::main]
-async fn main() {
-    // Manually load config
-    let config = ApplicationConfig::load_().unwrap_or_default();
-
-    println!("Starting on port {}", config.port);
-
-    let router = Router::new()
-        .get("/", handler);
-
-    Application::new(config, router).run().await.unwrap();
+    // 1. Load config.{toml,yaml,json}
+    // 2. Load config.{env}.{toml,yaml,json}
+    // 3. Load MIKO__ environment variables
+    // 4. Apply server settings and start
 }
 ```
 
@@ -131,124 +86,89 @@ async fn main() {
 
 ### Using `#[config]` Annotation
 
-Inject configuration values directly into Handler parameters:
+You can inject configuration values directly into Handler parameters.
+
+#### 1. Basic Usage
 
 ```rust
 #[get("/info")]
 async fn app_info(
     #[config("app.name")] app_name: String,
-    #[config("app.version")] version: String,
-    #[config("app.debug")] debug: bool,
-) -> Json<serde_json::Value> {
-    Json(json!({
-        "name": app_name,
-        "version": version,
-        "debug": debug
-    }))
+    #[config("server.port")] port: u16,
+) -> String {
+    format!("App: {}, Port: {}", app_name, port)
 }
 ```
 
-### Configuration Paths
+#### 2. Injection with Default Values (New in v0.8)
 
-Access nested configuration using dot-separated paths:
-
-```toml
-[database]
-host = "localhost"
-port = 5432
-
-[database.pool]
-min = 5
-max = 20
-```
+If a configuration item might not exist, you can provide a default value (literals supported):
 
 ```rust
-#[get("/db-config")]
-async fn db_config(
-    #[config("database.host")] host: String,
-    #[config("database.port")] port: u16,
-    #[config("database.pool.max")] max_connections: u32,
+#[get("/feature")]
+async fn feature_flag(
+    // If "app.enable_beta" is missing, use default false
+    #[config("app.enable_beta:false")] beta: bool,
+
+    // String default
+    #[config("app.theme:dark")] theme: String,
+
+    // Numeric default
+    #[config("app.max_items:100")] max_items: u32,
 ) -> String {
-    format!("DB: {}:{}, Max: {}", host, port, max_connections)
+    format!("Beta: {}, Theme: {}, Max: {}", beta, theme, max_items)
 }
 ```
 
-### Supported Types
+#### 3. Injecting Structs
 
-`#[config]` supports all types that implement `serde::Deserialize`:
-
-```rust
-// Basic types
-#[config("port")] port: u16
-#[config("debug")] debug: bool
-#[config("name")] name: String
-#[config("timeout")] timeout: f64
-
-// Collection types
-#[config("allowed_origins")] origins: Vec<String>
-#[config("features")] features: HashMap<String, bool>
-
-// Custom structs
-#[derive(Deserialize)]
-struct DatabaseConfig {
-    host: String,
-    port: u16,
-    database: String,
-}
-
-#[get("/db-config")]
-async fn db_config(
-    #[config("database")] db_config: DatabaseConfig
-) -> String {
-    format!("{}:{}/{}", db_config.host, db_config.port, db_config.database)
-}
-
-// Optional types
-#[get("/optional")]
-async fn optional_config(
-    #[config("features.beta")] beta: Option<bool>
-) -> String {
-    format!("Beta enabled: {}", beta.unwrap_or(false))
-}
-```
-
-## Programmatic Access to Configuration
-
-### Get Configuration Section
+`#[config]` supports injecting any struct that implements `Deserialize`:
 
 ```rust
-use miko::app::config::load_config_section;
-use serde::Deserialize;
-
 #[derive(Deserialize)]
 struct DatabaseConfig {
     url: String,
     max_connections: u32,
 }
 
-async fn init_db() -> Result<Database, Error> {
-    let config: DatabaseConfig = load_config_section("database")?;
-    Database::connect(&config.url).await
+#[get("/db")]
+async fn db_info(
+    #[config("database")] db: DatabaseConfig
+) -> String {
+    format!("DB URL: {}", db.url)
 }
 ```
 
-### Get Full Configuration
+## Programmatic Access
+
+If you need to access configuration outside of Handlers (e.g., in `main` or custom components):
 
 ```rust
-use miko::app::config::get_config;
-use toml::Value;
+use miko::app::config::{get_settings, get_settings_value};
 
-fn get_feature_flag(name: &str) -> bool {
-    let config = get_config();
-    config.get("features")
-        .and_then(|f| f.get(name))
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false)
+fn some_function() {
+    // 1. Get the entire configuration object (config::Config)
+    let settings = get_settings();
+    let port = settings.get_int("server.port").unwrap_or(8080);
+
+    // 2. Get specific typed configuration value (supports generics)
+    let app_name: String = get_settings_value("app.name").unwrap_or_default();
 }
 ```
+
+## Migration Guide (v0.7 -> v0.8)
+
+If you are upgrading from an older version, please note the following breaking changes:
+
+1. **Config Section Change**: `[application]` section is renamed to `[server]`.
+    * `addr` -> `host`
+    * `port` -> `port`
+2. **API Changes**:
+    * `ApplicationConfig` is removed, use `ServerSettings`.
+    * `ApplicationConfig::load_()` is removed.
+3. **Dependency Change**: Replaced `toml` crate with `config` crate.
 
 ## Next Steps
 
-- 💉 Use [Dependency Injection](dependency_injection.md) to manage components.
-- 🔍 Understand [Request Extractor](request_extractors.md) usage.
-- 📖 Review [Basic Concepts](basic_concepts.md) to understand the architecture.
+- 💉 Use [Dependency Injection](dependency_injection.md) to manage components
+- 🔍 Understand [Request Extractors](request_extractors.md) usage

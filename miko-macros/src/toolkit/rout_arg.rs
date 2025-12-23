@@ -223,18 +223,11 @@ pub fn build_config_value_injector(
 fn parse_expr_by_type(ty: &Type, path: String, ident: syn::Ident, unwrap: bool) -> TokenStream {
     if unwrap {
         quote! {
-            let #ident = ::miko::app::config::get_config_value(#path)
-                .and_then(|v| {
-                    v.clone().try_into::<#ty>().ok()
-                })
-                .unwrap();
+            let #ident = ::miko::app::config::get_settings_value::<#ty>(#path)?;
         }
     } else {
         quote! {
-            let #ident = ::miko::app::config::get_config_value(#path)
-                .and_then(|v| {
-                    v.clone().try_into::<#ty>().ok()
-                });
+            let #ident = ::miko::app::config::get_settings_value::<#ty>(#path);
         }
     }
 }
