@@ -3,8 +3,12 @@ use crate::route::core::route_handler;
 use crate::toolkit::attr::StrAttrMap;
 #[cfg(feature = "auto")]
 use crate::toolkit::impl_operation::{get_constructor, inject_deps};
+use crate::toolkit::rout_arg::{
+    FnArgResult, IntoFnArgs, RouteFnArg, build_clone_stmt, build_config_value_injector,
+    build_dep_injector,
+};
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::{ItemFn, ItemMod, parse_macro_input};
 
 mod extractor;
@@ -582,4 +586,61 @@ pub fn prefix(attr: TokenStream, item: TokenStream) -> TokenStream {
         mod_transform::TransformOp::Prefix(prefix_attr.path),
     );
     quote! { #mod_item }.into()
+}
+
+/// 中间件
+#[proc_macro_attribute]
+pub fn middleware(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut input_fn = parse_macro_input!(item as ItemFn);
+    let fn_name = &input_fn.sig.ident;
+    let vis = &input_fn.vis;
+    let block = &input_fn.block;
+    let attrs = &input_fn.attrs;
+    let args = RouteFnArg::from_punctuated(&mut input_fn.sig.inputs);
+    let mut req_ident = format_ident!("_req");
+    let mut next_ident = format_ident!("_next");
+    let mut config_stmts = Vec::new();
+    let mut deps_stmts = Vec::new();
+    let mut clone_stmts = Vec::new();
+    build_dep_injector(&args, &mut deps_stmts);
+    build_config_value_injector(&args, &mut config_stmts);
+    let outer_args = args.gen_fn_args(|rfa| {
+        // 判断是否是req, next
+        if let syn::Type::Path(path) = &rfa.ty {
+            if path.path.segments.last().unwrap().ident == "Req" {
+                req_ident = rfa.ident.clone();
+                return FnArgResult::Remove;
+            } else if path.path.segments.last().unwrap().ident == "Next" {
+                next_ident = rfa.ident.clone();
+                return FnArgResult::Remove;
+            }
+        }
+        // 判断是否是 #[config] #[dep]
+        if !rfa.mark.is_empty() {
+            if rfa.marked_by("config") || rfa.marked_by("dep") {
+                return FnArgResult::Remove;
+            } else {
+                panic!("middleware only support mark #[config] or #[dep]");
+            }
+        }
+        // 其余变量
+        build_clone_stmt(rfa, &mut clone_stmts);
+        FnArgResult::Keep
+    });
+    let mut inputs = input_fn.sig.inputs;
+    inputs.clear();
+    inputs.extend(outer_args);
+    quote! {
+        #(#attrs)*
+        #vis fn #fn_name (#inputs) -> ::miko::middleware::FromFnLayer<impl Fn(::miko::miko_core::Req, ::miko::middleware::Next) -> ::std::pin::Pin<Box<dyn ::std::future::Future<Output = ::miko::AppResult<::miko::miko_core::Resp>> + Send>> + Clone> {
+            ::miko::middleware::middleware_from_fn(move |#req_ident: ::miko::miko_core::Req, #next_ident: ::miko::middleware::Next| {
+                #( #clone_stmts )*
+                Box::pin(async move {
+                    #( #deps_stmts )*
+                    #( #config_stmts )*
+                    #block
+                }) as ::std::pin::Pin<Box<dyn ::std::future::Future<Output = ::miko::AppResult<::miko::miko_core::Resp>> + Send>>
+            })
+        }
+    }.into()
 }

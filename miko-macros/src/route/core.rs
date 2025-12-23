@@ -60,18 +60,6 @@ pub fn route_handler(args: RouteAttr, mut fn_item: ItemFn) -> TokenStream {
     //处理dep
     let mut dep_stmts = Vec::new();
     build_dep_injector(&rfa, &mut dep_stmts);
-    #[cfg(feature = "auto")]
-    let dep_stmts = if dep_stmts.is_empty() {
-        dep_stmts
-    } else {
-        dep_stmts.insert(
-            0,
-            quote! {
-                let __dep_container = ::miko::dependency_container::get_global_dc().await;
-            },
-        );
-        dep_stmts
-    };
     // 处理config_value
     let mut config_value_stmts = Vec::new();
     build_config_value_injector(&rfa, &mut config_value_stmts);
@@ -176,18 +164,6 @@ pub fn route_handler_no_register(args: RouteAttr, mut fn_item: ItemFn) -> TokenS
     //处理dep
     let mut dep_stmts = Vec::new();
     build_dep_injector(&rfa, &mut dep_stmts);
-    #[cfg(feature = "auto")]
-    let dep_stmts = if dep_stmts.is_empty() {
-        dep_stmts
-    } else {
-        dep_stmts.insert(
-            0,
-            quote! {
-                let __dep_container = ::miko::dependency_container::get_global_dc().await;
-            },
-        );
-        dep_stmts
-    };
     // 处理config_value
     let mut config_value_stmts = Vec::new();
     build_config_value_injector(&rfa, &mut config_value_stmts);

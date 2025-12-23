@@ -234,6 +234,89 @@ async fn process_data() -> &'static str {
 }
 ```
 
+## Declarative Middleware
+
+Miko provides the `#[middleware]` macro, allowing you to define middleware just like writing a normal Handler.
+
+### Basic Usage
+
+Mark an async function with `#[middleware]`, and it will automatically get `_req` (request) and `_next` (next
+middleware) variables.
+
+```rust
+use miko::*;
+use miko::macros::*;
+
+#[middleware]
+async fn simple_logger() -> AppResult<Resp> {
+    println!("Before request");
+    let resp = _next.run(_req).await?;
+    println!("After request");
+    Ok(resp)
+}
+
+#[get("/")]
+#[layer(simple_logger())] // Apply middleware
+async fn hello() -> &'static str {
+    "Hello"
+}
+```
+
+### Argument Injection
+
+Middleware functions support the following types of arguments:
+
+1. **Explicit `Req` and `Next`**: If you want to customize variable names.
+2. **Normal Arguments**: Passed when applying the middleware.
+3. **Dependency Injection (`#[dep]`)**: Automatically injected from the dependency container.
+4. **Configuration Injection (`#[config]`)**: Automatically injected from the configuration file.
+
+```rust
+#[middleware]
+async fn auth_guard(
+    // Normal argument, passed in #[layer(auth_guard(role))]
+    required_role: String,
+    // Dependency injection
+    #[dep] db: Arc<Database>,
+    // Config injection
+    #[config("jwt.secret")] secret: String,
+    // Explicit Req and Next (optional)
+    req: Req,
+    next: Next,
+) -> AppResult<Resp> {
+    // Check permissions...
+    if !check_permission(&db, &secret, &required_role) {
+        return Err(AppError::Forbidden("Access denied".into()));
+    }
+    next.run(req).await
+}
+
+// Use middleware
+#[get("/admin")]
+#[layer(auth_guard("admin".to_string()))]
+async fn admin_panel() -> &'static str {
+    "Admin Content"
+}
+```
+
+### Capturing Context Variables
+
+Declarative middleware automatically captures external variables (via Clone), making argument passing very convenient.
+
+```rust
+#[middleware]
+async fn with_id(id: i32) -> AppResult<Resp> {
+    println!("ID is {}", id);
+    _next.run(_req).await
+}
+
+#[get("/")]
+#[layer(with_id(10086))]
+async fn index() -> &'static str {
+    "ok"
+}
+```
+
 ## Tower Middleware Compatibility
 
 Miko is fully compatible with middleware from the Tower ecosystem, including those that modify the Body type (like

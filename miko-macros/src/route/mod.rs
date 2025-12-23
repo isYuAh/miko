@@ -76,18 +76,18 @@ pub fn build_register_expr(ra: &RouteAttr, fn_name: &Ident, layers: &[LayerAttr]
                     );
                     #(
                         let __svc = {
-                            let layered = ::tower::Layer::layer(&#layer_exprs, __svc);
-                            ::tower::ServiceExt::map_response(layered, |resp| {
+                            let layered = ::miko::tower::Layer::layer(&#layer_exprs, __svc);
+                            ::miko::tower::ServiceExt::map_response(layered, |resp| {
                                 let (parts, body) = resp.into_parts();
-                                let body = ::http_body_util::BodyExt::map_err(body, |err| {
-                                    ::miko_core::MikoError(::std::boxed::Box::new(err))
+                                let body = ::miko::http_body_util::BodyExt::map_err(body, |err| {
+                                    ::miko::miko_core::MikoError(::std::boxed::Box::new(err))
                                 });
-                                let boxed_body = ::http_body_util::BodyExt::boxed_unsync(body);
+                                let boxed_body = ::miko::http_body_util::BodyExt::boxed_unsync(body);
                                 ::miko::hyper::Response::from_parts(parts, boxed_body)
                             })
                         };
                     )*
-                    let __boxed = ::tower::util::BoxCloneService::new(__svc);
+                    let __boxed = ::miko::tower::util::BoxCloneService::new(__svc);
                     router.#service_method_name(#path, __boxed);
                 }
             });
