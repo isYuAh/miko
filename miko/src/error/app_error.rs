@@ -3,7 +3,7 @@ use crate::http::response::into_response::IntoResponse;
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::{Response, StatusCode};
-use miko_core::Resp;
+use miko_core::{MikoError, Resp};
 use serde_json::json;
 use std::any::Any;
 use std::convert::Infallible;
@@ -243,6 +243,12 @@ impl fmt::Display for AppError {
 impl std::error::Error for AppError {}
 
 // ============ From 实现：自动转换常见错误类型 ============
+
+impl From<MikoError> for AppError {
+    fn from(err: MikoError) -> Self {
+        err.0.into()
+    }
+}
 
 impl From<serde_json::Error> for AppError {
     fn from(err: serde_json::Error) -> Self {

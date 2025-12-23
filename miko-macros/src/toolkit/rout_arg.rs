@@ -79,14 +79,18 @@ impl RouteFnArg {
         }
         out
     }
+
+    pub fn marked_by(&self, key: &str) -> bool {
+        self.mark.contains_key(key)
+    }
 }
 
 pub trait IntoFnArgs {
-    fn gen_fn_args(&self, callback: impl Fn(&RouteFnArg) -> FnArgResult) -> Vec<FnArg>;
+    fn gen_fn_args(&self, callback: impl FnMut(&RouteFnArg) -> FnArgResult) -> Vec<FnArg>;
 }
 
 impl IntoFnArgs for Vec<RouteFnArg> {
-    fn gen_fn_args(&self, callback: impl Fn(&RouteFnArg) -> FnArgResult) -> Vec<FnArg> {
+    fn gen_fn_args(&self, mut callback: impl FnMut(&RouteFnArg) -> FnArgResult) -> Vec<FnArg> {
         let mut out = Vec::new();
         for rfa in self {
             let mut clone = rfa.origin.clone();
@@ -181,6 +185,14 @@ pub fn build_dep_injector(rfa: &Vec<RouteFnArg>, dep_stmts: &mut Vec<TokenStream
             dep_stmts.push(stmt);
         }
     }
+    if !dep_stmts.is_empty() {
+        dep_stmts.insert(
+            0,
+            quote! {
+                let __dep_container = ::miko::dependency_container::get_global_dc().await;
+            },
+        );
+    }
 }
 
 /// 为带有 `#[config(...)]` 的参数生成从配置读取并解析值的语句。
@@ -225,4 +237,17 @@ fn parse_expr_by_type(ty: &Type, path: String, ident: syn::Ident, unwrap: bool) 
                 });
         }
     }
+}
+
+#[allow(unused)]
+pub fn build_clone_stmts(rfa: &Vec<RouteFnArg>, stmts: &mut Vec<TokenStream>) {
+    for r in rfa {
+        build_clone_stmt(r, stmts);
+    }
+}
+pub fn build_clone_stmt(rfa: &RouteFnArg, stmts: &mut Vec<TokenStream>) {
+    let ident = &rfa.ident;
+    stmts.push(quote! {
+        let #ident = #ident.clone();
+    })
 }
