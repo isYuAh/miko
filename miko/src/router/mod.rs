@@ -119,7 +119,7 @@ impl<S: Send + Sync + 'static> Router<S> {
                     req.extensions_mut()
                         .insert(PathParams::from(&matched.params));
                     let mut handler = matched.value.clone();
-                    handler.call(req).await.unwrap().into_response()
+                    handler.call(req).await.into_response()
                 }
                 Err(_e) => Response::builder()
                     .status(hyper::StatusCode::NOT_FOUND)
