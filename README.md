@@ -213,7 +213,23 @@ async fn list_users(#[dep] db: Arc<Database>) -> Json<Vec<User>> {
 }
 ```
 
-默认情况下组件以单例模式注册；可通过 `#[component(transient)]` 或 `#[component(mode = "transient")]` 让每次注入都创建新的实例（此模式下不支持 `prewarm`）。
+### 声明式中间件
+
+使用 `#[middleware]` 定义可复用的中间件，支持参数注入：
+
+```rust
+#[middleware]
+async fn logger(#[config("app.name")] app_name: String) -> AppResult<Resp> {
+    println!("Request to {}", app_name);
+    _next.run(_req).await
+}
+
+#[get("/")]
+#[layer(logger())]
+async fn hello() -> &'static str {
+    "Hello"
+}
+```
 
 ### OpenAPI 文档
 

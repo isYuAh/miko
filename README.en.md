@@ -214,7 +214,23 @@ async fn list_users(#[dep] db: Arc<Database>) -> Json<Vec<User>> {
 }
 ```
 
-Components are singletons by default. Use `#[component(transient)]` (or `#[component(mode = "transient")]`) when you need a brand-new instance for every injection; `prewarm` remains available only for singleton components.
+### Declarative Middleware
+
+Define reusable middleware using `#[middleware]`, supporting argument injection:
+
+```rust
+#[middleware]
+async fn logger(#[config("app.name")] app_name: String) -> AppResult<Resp> {
+    println!("Request to {}", app_name);
+    _next.run(_req).await
+}
+
+#[get("/")]
+#[layer(logger())]
+async fn hello() -> &'static str {
+    "Hello"
+}
+```
 
 ### OpenAPI Documentation
 
