@@ -25,7 +25,6 @@ miko-core = { workspace = true }
 miko-macros = { workspace = true, optional = true }
 hyper = {version = "1.7.0", features = ["server", "http1"]}
 hyper-util = {version = "0.1.17", features = ["full"]}
-toml = "0.9.7"
 anyhow = "1.0.100"
 inventory = {version =  "0.3.21", optional = true }
 multer = "3.1.0"
@@ -38,9 +37,10 @@ tungstenite = "0.28.0"
 tokio-tungstenite = "0.28.0"
 utoipa = { version = "5", optional = true }
 garde = { version = "0.20", optional = true, features = ["derive"] }
+config = { version = "0.15.19", default-features = false }
 
 [features]
-default = ["macro", "auto", "ext"]
+default = ["macro", "auto", "ext", "config-toml"]
 full = ["default", "utoipa", "validation", "catch_panic"]
 macro = ["miko-macros"]
 auto = ["macro", "miko-macros/auto", "inventory"]
@@ -49,6 +49,11 @@ catch_panic = ["dep:tower-http", "tower-http/catch-panic", "miko-macros/catch_pa
 utoipa = ["miko-macros/utoipa", "dep:utoipa"]
 validation = ["garde"]
 test = []
+# config
+config-yaml = ["config/yaml"]
+config-json = ["config/json"]
+config-json5 = ["config/json5"]
+config-toml = ["config/toml"]
 
 [[example]]
 name = "basic"

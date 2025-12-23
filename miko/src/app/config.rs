@@ -1,120 +1,85 @@
-use anyhow::{Error, anyhow};
+use anyhow::{Context, Error};
+use config::Config;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::env;
 use std::sync::OnceLock;
-use toml::Value;
-use toml::map::Map;
 
-static CONFIG: OnceLock<Value> = OnceLock::new();
-
-/// 应用层配置（监听地址与端口）
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ApplicationConfig {
-    pub addr: String,
-    pub port: u16,
+pub fn load_config_sources() -> Result<Config, Error> {
+    let env = env::var("CONFIG_ENV").unwrap_or_else(|_| {
+        if cfg!(debug_assertions) {
+            "dev".to_string()
+        } else {
+            "prod".to_string()
+        }
+    });
+    Ok(Config::builder()
+        .set_default("server.host", "0.0.0.0")?
+        .set_default("server.port", 8080)?
+        .add_source(config::File::with_name("./config").required(false))
+        .add_source(config::File::with_name(&format!("./config.{}", env)).required(false))
+        .add_source(config::Environment::with_prefix("MIKO").separator("__"))
+        .build()?)
 }
-impl ApplicationConfig {
-    /// 从配置文件加载 ApplicationConfig，失败则返回错误
-    pub fn load_() -> Result<Self, Box<dyn std::error::Error>> {
-        let base: Value = load_config_section("application")?;
-        Ok(base
-            .try_into()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?)
+
+static SETTINGS: OnceLock<Config> = OnceLock::new();
+
+pub fn get_settings() -> &'static Config {
+    SETTINGS.get_or_init(|| {
+        load_config_sources().expect("Failed to initialize configuration. Check your config files.")
+    })
+}
+pub fn get_settings_value<T: DeserializeOwned>(path: &str) -> Result<T, Error> {
+    let (path, default_val) = match path.rsplit_once(":") {
+        Some((p, d)) => (p, Some(d)),
+        None => (path, None),
+    };
+    let settings = get_settings();
+
+    // 尝试从配置源获取
+    match settings.get::<T>(path) {
+        Ok(v) => Ok(v),
+        Err(config_err) => {
+            // 如果配置里没找到，且我们有字面量默认值
+            if let Some(def_str) = default_val {
+                // 尝试解析默认值
+                try_parse_default_value(def_str).with_context(|| {
+                    format!(
+                        "Config key '{}' not found, and failed to parse default literal '{}'",
+                        path, def_str
+                    )
+                })
+            } else {
+                // 没有默认值，直接抛出原始错误
+                Err(config_err.into())
+            }
+        }
     }
 }
-impl Default for ApplicationConfig {
+fn try_parse_default_value<T: DeserializeOwned>(val: &str) -> Result<T, serde_json::Error> {
+    let res = serde_json::from_str::<T>(val);
+    res.or_else(|_| serde_json::from_value(serde_json::Value::String(val.to_string())))
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ServerSettings {
+    pub host: String,
+    pub port: u16,
+}
+impl Default for ServerSettings {
     fn default() -> Self {
-        Self {
-            addr: "0.0.0.0".to_string(),
+        ServerSettings {
+            host: "0.0.0.0".to_string(),
             port: 8080,
         }
     }
 }
-impl ApplicationConfig {
-    /// 便于回退时构建默认 toml 值的辅助函数
-    pub fn to_hash_map(&self) -> HashMap<String, String> {
-        let mut map = HashMap::new();
-        map.insert("addr".to_string(), self.addr.clone());
-        map.insert("port".to_string(), self.port.to_string());
-        map
-    }
-}
-
-fn merge_toml(base: &mut Value, other: &Value) {
-    match (base, other) {
-        (Value::Table(base_t), Value::Table(other_t)) => {
-            for (k, v) in other_t {
-                match base_t.get_mut(k) {
-                    Some(bv) => merge_toml(bv, v),
-                    None => {
-                        base_t.insert(k.clone(), v.clone());
-                    }
-                }
-            }
-        }
-        (b, o) => *b = o.clone(),
-    }
-}
-
-/// 读取并合并配置：config.toml 与 dev/prod 额外文件
-pub fn load_and_merge_toml() -> Result<Value, Error> {
-    let content = std::fs::read_to_string("./config.toml").inspect_err(|e| {
-        tracing::warn!("Failed to read config.toml: {:?}", e);
-    })?;
-    let mut base: Value = toml::from_str(&content).inspect_err(|e| {
-        tracing::warn!("Failed to parse config.toml: {:?}", e);
-    })?;
-    let env = if cfg!(debug_assertions) {
-        "dev"
-    } else {
-        "prod"
-    };
-    if let Ok(env_base) = std::fs::read_to_string(format!("./config.{env}.value")) {
-        merge_toml(&mut base, &toml::from_str(&env_base)?);
-    }
-    Ok(base)
-}
-
-/// 获取全局配置值（延迟加载并缓存）
-pub fn get_config() -> &'static Value {
-    CONFIG.get_or_init(|| {
-        let val = load_and_merge_toml();
-        val.unwrap_or_else(|e| {
-            tracing::error!("Failed to load config: {:?}", e);
-            let default = ApplicationConfig::default();
-            let mut map = Map::new();
-            map.insert(
-                "application".to_string(),
-                Value::from(default.to_hash_map()),
-            );
-            Value::Table(map)
+impl ServerSettings {
+    pub fn from_global_settings() -> Self {
+        let settings = get_settings();
+        settings.get("server").unwrap_or_else(|_| {
+            tracing::warn!("Using default server settings.");
+            ServerSettings::default()
         })
-    })
-}
-
-/// 读取指定 section 并反序列化为 T
-pub fn load_config_section<T: DeserializeOwned>(section: &str) -> Result<T, Error> {
-    let config = get_config();
-    let section_value = config
-        .get(section)
-        .ok_or_else(|| anyhow!("Configuration section '[{}]' not found.", section))?;
-
-    section_value
-        .clone()
-        .try_into()
-        .map_err(|e| anyhow!("Failed to deserialize section '[{}]': {:?}", section, e))
-}
-
-/// 从一个 toml::Value 开始，按路径（如 a.b.c）获取子值
-pub fn get_toml_value_by_path<'a>(value: &'a Value, path: &str) -> Option<&'a Value> {
-    let mut current = Some(value);
-    for key in path.split('.') {
-        current = current.and_then(|v| v.get(key));
     }
-    current
-}
-/// 直接从全局配置中按路径取值
-pub fn get_config_value(path: &str) -> Option<&Value> {
-    get_toml_value_by_path(get_config(), path)
 }

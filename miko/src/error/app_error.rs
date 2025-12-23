@@ -250,6 +250,13 @@ impl From<MikoError> for AppError {
     }
 }
 
+impl From<config::ConfigError> for AppError {
+    fn from(err: config::ConfigError) -> Self {
+        tracing::warn!("Configuration error: {:?}", err);
+        Self::InternalServerError("Internal Configuration error".to_string())
+    }
+}
+
 impl From<serde_json::Error> for AppError {
     fn from(err: serde_json::Error) -> Self {
         Self::JsonParseError(err)

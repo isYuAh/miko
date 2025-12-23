@@ -103,7 +103,7 @@ pub fn miko(attr: TokenStream, item: TokenStream) -> TokenStream {
         quote! {
             #fn_vis async fn #fn_name() -> ::miko::app::Application {
                 #set_panic_hook
-                let mut _config = ::miko::app::config::ApplicationConfig::load_().unwrap_or_default();
+                let mut _config = ::miko::app::config::ServerSettings::from_global_settings();
                 let mut router = ::miko::router::Router::new();
                 #catch_panic
                 #dep_init
@@ -119,7 +119,7 @@ pub fn miko(attr: TokenStream, item: TokenStream) -> TokenStream {
             #[::miko::tokio::main]
             async fn main() {
                 #set_panic_hook
-                let mut _config = ::miko::app::config::ApplicationConfig::load_().unwrap_or_default();
+                let mut _config = ::miko::app::config::ServerSettings::from_global_settings();
                 let mut router = ::miko::router::Router::new();
                 #catch_panic
                 #dep_init
